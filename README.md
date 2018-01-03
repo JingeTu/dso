@@ -1,3 +1,5 @@
+I just do some notes here, for the convenience of my understanding.
+
 # DSO: Direct Sparse Odometry
 
 For more information see
