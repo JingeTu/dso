@@ -123,7 +123,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	{
 
 
-
+    //- Set the depth of current level points with the points' parents in the upper level.
 		if(lvl<pyrLevelsUsed-1)
 			propagateDown(lvl+1);
 
@@ -401,9 +401,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
+      //- Projected pattern point color(wiht bilinear interpolated).
+      //- In new frame.
 			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);
 			//Vec3f hitColor = getInterpolatedElement33BiCub(colorNew, Ku, Kv, wl);
 
+			//- In reference frame, pattern point color.
 			//float rlR = colorRef[point->u+dx + (point->v+dy) * wl][0];
 			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl);
 
@@ -420,7 +423,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 
 
-
+      //- t: refToNew translation.
 			float dxdd = (t[0]-t[2]*u)/pt[2];
 			float dydd = (t[1]-t[2]*v)/pt[2];
 
@@ -452,7 +455,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			JbBuffer_new[i][7] += dp7[idx]*dd[idx];
 			JbBuffer_new[i][8] += r[idx]*dd[idx];
 			JbBuffer_new[i][9] += dd[idx]*dd[idx];
-		}
+		} //- end for patternNum
 
 		if(!isGood || energy > point->outlierTH*20)
 		{
@@ -489,7 +492,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 					(float)r[i]);
 
 
-	}
+	} //- end for npts
 
 	E.finish();
 	acc9.finish();
@@ -659,7 +662,7 @@ void CoarseInitializer::optReg(int lvl)
 
 		if(nnn > 2)
 		{
-			std::nth_element(idnn,idnn+nnn/2,idnn+nnn);
+			std::nth_element(idnn,idnn+nnn/2,idnn+nnn); //- Get the median.
 			point->iR = (1-regWeight)*point->idepth + regWeight*idnn[nnn/2];
 		}
 	}
@@ -732,10 +735,14 @@ void CoarseInitializer::propagateDown(int srcLvl)
 		}
 		else
 		{
+			//- Kind of weighted iR. Combined parent and point itself.
 			float newiR = (point->iR*point->lastHessian*2 + parent->iR*parent->lastHessian) / (point->lastHessian*2+parent->lastHessian);
 			point->iR = point->idepth = point->idepth_new = newiR;
 		}
 	}
+
+	//- Regularization. 
+	//- Combine neighbours' median iR with center point's iR with regWeight.
 	optReg(srcLvl-1);
 }
 
@@ -775,6 +782,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 	float* statusMap = new float[w[0]*h[0]];
 	bool* statusMapB = new bool[w[0]*h[0]];
 
+  // std::cout << "patternPadding: " << patternPadding << std::endl;
 	float densities[] = {0.03,0.05,0.15,0.5,1};
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
 	{
@@ -784,7 +792,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 			npts = sel.makeMaps(firstFrame, statusMap,densities[lvl]*w[0]*h[0],1,false,2);
 		else
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
-
+		// std::cout << "lvl: " << lvl << "\t densities[lvl]*w[0]*h[0]: " << densities[lvl]*w[0]*h[0] << "\t npts: " << npts << std::endl;
 
 
 		if(points[lvl] != 0) delete[] points[lvl];
@@ -803,7 +811,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 				//assert(patternNum==9);
 				pl[nl].u = x+0.1;
 				pl[nl].v = y+0.1;
-				pl[nl].idepth = 1;
+				pl[nl].idepth = 1; //- The inverse depth.
 				pl[nl].iR = 1;
 				pl[nl].isGood=true;
 				pl[nl].energy.setZero();
@@ -836,10 +844,13 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 
 
 		numPoints[lvl]=nl;
+		// std::cout << "lvl: " << lvl << "\t numPoints[lvl]: " << numPoints[lvl] << std::endl;
 	}
 	delete[] statusMap;
 	delete[] statusMapB;
 
+  //- Find the nearest 10 neighbours in the same level.
+  //- Find the nearest neighbour in the level + 1 as parent.
 	makeNN();
 
 	thisToNext=SE3();
@@ -860,7 +871,8 @@ void CoarseInitializer::resetPoints(int lvl)
 		pts[i].energy.setZero();
 		pts[i].idepth_new = pts[i].idepth;
 
-
+    //- If in the top level of pyramid and the point is not good,
+    //- use neighbours' average iR to set the point's iR.
 		if(lvl==pyrLevelsUsed-1 && !pts[i].isGood)
 		{
 			float snd=0, sn=0;

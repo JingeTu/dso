@@ -128,6 +128,17 @@ void FrameHessian::release()
 void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 {
 
+  //- dIp corresponds to the pyrLevellsUsed.
+  //- The size of each level is the same as the pyramid image.
+  //- The cell is a Eigen::Vector3f
+  //- [0] the pyramid image(desampled)
+  //- [1] dx
+  //- [2] dy
+
+  //- absSquaredGrad corresponds to the pyrLevellsUsed.
+  //- The size of each level is the same as the pyramid image.
+  //- The value is a float: dx*dx+dy*dy or (dx*dx+dy*dy)*(gw*gw).
+  //- With the gw*gw, convert the gradient to the original color space.
 	for(int i=0;i<pyrLevelsUsed;i++)
 	{
 		dIp[i] = new Eigen::Vector3f[wG[i]*hG[i]];
@@ -158,7 +169,7 @@ void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 
 			for(int y=0;y<hl;y++)
 				for(int x=0;x<wl;x++)
-				{
+				{ //- desampled
 					dI_l[x + y*wl][0] = 0.25f * (dI_lm[2*x   + 2*y*wlm1][0] +
 												dI_lm[2*x+1 + 2*y*wlm1][0] +
 												dI_lm[2*x   + 2*y*wlm1+wlm1][0] +
@@ -181,6 +192,8 @@ void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 
 			dabs_l[idx] = dx*dx+dy*dy;
 
+      //- Refer to settings.cpp for setting_gammaWeightsPixelSelect.
+      //- 1 = use original intensity for pixel selection; 0 = use gamma-corrected intensity.
 			if(setting_gammaWeightsPixelSelect==1 && HCalib!=0)
 			{
 				float gw = HCalib->getBGradOnly((float)(dI_l[idx][0]));

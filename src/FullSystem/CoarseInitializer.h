@@ -65,10 +65,12 @@ public:
 	float maxstep;
 
 	// idx (x+y*w) of closest point one pyramid level above.
+	//- lvl + 1
 	int parent;
 	float parentDist;
 
 	// idx (x+y*w) of up to 10 nearest points in pixel space.
+	//- The same level.
 	int neighbours[10];
 	float neighboursDist[10];
 

@@ -195,6 +195,9 @@ int PixelSelector::makeMaps(
 		idealPotential = sqrtf(K/numWant)-1;	// round down.
 		if(idealPotential<1) idealPotential=1;
 
+  // std::cout << "*******************recursionsLeft: " << recursionsLeft << std::endl;
+  // std::cout << "*******************quotia: " << quotia << std::endl;
+  // std::cout << "*******************currentPotential: " << currentPotential << std::endl;
 		if( recursionsLeft>0 && quotia > 1.25 && currentPotential>1)
 		{
 			//re-sample to get more points!

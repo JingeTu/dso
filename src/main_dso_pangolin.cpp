@@ -414,7 +414,8 @@ int main( int argc, char** argv )
 
 
 
-
+    //- MacOS can just modify the graphics in the main thread.
+    //- So here fork another thread to do the calculation.
     // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
     std::thread runthread([&]() {
         std::vector<int> idsToPlay;
@@ -463,7 +464,10 @@ int main( int argc, char** argv )
 
             int i = idsToPlay[ii];
 
-
+            //- Preloaded images from disk, save time here. The Frequencey can be 25Hz.
+            //- If not, just 11Hz.
+            //- ImageFolderReader::getImage() is to get image from the file, and do the 
+            //- photometric rectification. The ImageAndExposure::image is the radiance value. 
             ImageAndExposure* img;
             if(preload)
                 img = preloadedImages[ii];
@@ -488,7 +492,7 @@ int main( int argc, char** argv )
             }
 
 
-
+            //- Here is the entry to the system.
             if(!skipFrame) fullSystem->addActiveFrame(img, i);
 
 
