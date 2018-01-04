@@ -389,8 +389,10 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 
 			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
+			//- u, v is the normalized plane coordiantes. Not the image pixel coordinates.
 			float u = pt[0] / pt[2];
 			float v = pt[1] / pt[2];
+			//- Ku, Kv is the image pixel coordinates.
 			float Ku = fxl * u + cxl;
 			float Kv = fyl * v + cyl;
 			float new_idepth = point->idepth_new/pt[2];
@@ -416,7 +418,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
-
+			//- All we want is to minimize this residual.
 			float residual = hitColor[0] - r2new_aff[0] * rlR - r2new_aff[1];
 			float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
 			energy += hw *residual*residual*(2-hw);
@@ -428,6 +430,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float dydd = (t[1]-t[2]*v)/pt[2];
 
 			if(hw < 1) hw = sqrtf(hw);
+			//- hitColor[1] is dx in the new image. (image gradient)
+			//- hitColor[2] is dy in the new image. (image gradient)
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
 			dp0[idx] = new_idepth*dxInterp;
