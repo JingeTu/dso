@@ -180,7 +180,7 @@ int PixelSelector::makeMaps(
 		// the number of selected pixels behaves approximately as
 		// K / (pot+1)^2, where K is a scene-dependent constant.
 		// we will allow sub-selecting pixels by up to a quotia of 0.25, otherwise we will re-select.
-
+		//- set thsSmoothed for each cell
 		if(fh != gradHistFrame) makeHists(fh);
 
 		// select!

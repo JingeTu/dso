@@ -55,7 +55,7 @@ namespace dso
 
 
 
-void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
+void FullSystem::flagFramesForMarginalization()
 {
 	if(setting_minFrameAge > setting_maxFrames)
 	{
@@ -82,7 +82,7 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 
 
 		if( (in < setting_minPointsRemaining *(in+out) || fabs(logf((float)refToFh[0])) > setting_maxLogAffFacInWindow)
-				&& ((int)frameHessians.size())-flagged > setting_minFrames)
+				&& ((int)frameHessians.size() - flagged > setting_minFrames))
 		{
 //			printf("MARGINALIZE frame %d, as only %'d/%'d points remaining (%'d %'d %'d %'d). VisInLast %'d / %'d. traces %d, activated %d!\n",
 //					fh->frameID, in, in+out,

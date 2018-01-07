@@ -478,7 +478,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 			buf_warped_refColor[numTermsInWarped] = lpc_color[i];
 			numTermsInWarped++;
 		}
-	}
+	} //- end for nl(level points)
 
 	while(numTermsInWarped%4!=0)
 	{

@@ -80,6 +80,7 @@ CoarseInitializer::~CoarseInitializer()
 
 bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps)
 {
+	//- Track newFrameHessian with firsFrame. No point extract for newFrameHessian
 	newFrame = newFrameHessian;
 
     for(IOWrap::Output3DWrapper* ow : wraps)
@@ -184,6 +185,13 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			Vec3f resNew = calcResAndGS(lvl, H_new, b_new, Hsc_new, bsc_new, refToNew_new, refToNew_aff_new, false);
 			Vec3f regEnergy = calcEC(lvl);
 
+			//- resNew[0] is the photometric residual energy.
+			//- resNew[0] is the affine light transformation energy.
+			//- the same for resOld
+			//- regEnergy[0] is the sum of (point->idepth - point->iR) for all level points.
+			//- regEnergy[1] is the sum of (point->idepth_new - point->iR) for all level points.
+			//- So regEnergy is some energy about idepth energy.
+			//- I don't know what iR represents, now.
 			float eTotalNew = (resNew[0]+resNew[1]+regEnergy[1]);
 			float eTotalOld = (resOld[0]+resOld[1]+regEnergy[0]);
 
@@ -246,7 +254,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			iteration++;
 		}
 		latestRes = resOld;
-
+		// std::cout << "It takes " << iteration << " iterations for CoarseInitializer::trackFrame to converging." << std::endl;
 	}
 
 
@@ -588,7 +596,10 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 
 
-
+	//- E.A is all the points energy.
+	//- alphaEnergy is energy about affine light transformation energy.
+	//- E.num is two times the level points' num.
+	// std::cout << "lvl: " << lvl << "\tnpts: " << npts << "\tE.num: " << E.num << std::endl;	
 	return Vec3f(E.A, alphaEnergy ,E.num);
 }
 
@@ -746,7 +757,7 @@ void CoarseInitializer::propagateDown(int srcLvl)
 	}
 
 	//- Regularization. 
-	//- Combine neighbours' median iR with center point's iR with regWeight.
+	//- Combine neighbours' median iR and center point's iR with regWeight.
 	optReg(srcLvl-1);
 }
 
@@ -775,6 +786,8 @@ void CoarseInitializer::makeGradients(Eigen::Vector3f** data)
 		}
 	}
 }
+
+//- Select high gradient points and store them in member variable points.
 void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHessian)
 {
 

@@ -284,6 +284,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	AffLight aff_last_2_l = AffLight(0,0);
 
 	std::vector<SE3,Eigen::aligned_allocator<SE3>> lastF_2_fh_tries;
+	lastF_2_fh_tries.reserve(31);
 	if(allFrameHistory.size() == 2)
 		for(unsigned int i=0;i<lastF_2_fh_tries.size();i++) lastF_2_fh_tries.push_back(SE3());
 	else
@@ -359,6 +360,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	// I'll keep track of the so-far best achieved residual for each level in achievedRes.
 	// If on a coarse level, tracking is WORSE than achievedRes, we will not continue to save time.
 
+  // std::cout << "In trackNewCoarse\t" << fh->shell->id << "\t lastF_2_fh_tries.size(): " << lastF_2_fh_tries.size() << std::endl;
 
 	Vec5 achievedRes = Vec5::Constant(NAN);
 	bool haveOneGood = false;
@@ -395,7 +397,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		// do we have a new winner?
 		if(trackingIsGood && std::isfinite((float)coarseTracker->lastResiduals[0]) && !(coarseTracker->lastResiduals[0] >=  achievedRes[0]))
 		{
-			//printf("take over. minRes %f -> %f!\n", achievedRes[0], coarseTracker->lastResiduals[0]);
+			// printf("take over. minRes %f -> %f!\n", achievedRes[0], coarseTracker->lastResiduals[0]);
 			flowVecs = coarseTracker->lastFlowIndicators;
 			aff_g2l = aff_g2l_this;
 			lastF_2_fh = lastF_2_fh_this;
@@ -481,6 +483,8 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 
 		Vec2f aff = AffLight::fromToVecExposure(host->ab_exposure, fh->ab_exposure, host->aff_g2l(), fh->aff_g2l()).cast<float>();
 
+		//- For all the immature points in active window frame, trace them in the current frame.
+		//- This is the set a better inverse depth for the immature points.
 		for(ImmaturePoint* ph : host->immaturePoints)
 		{
 			ph->traceOn(fh, KRKi, Kt, aff, &Hcalib, false );
@@ -634,7 +638,7 @@ void FullSystem::activatePointsMT()
 				host->immaturePoints[i]=0;
 			}
 		}
-	}
+	} //- end for for(FrameHessian* host : frameHessians)
 
 
 //	printf("ACTIVATE: %d. (del %d, notReady %d, marg %d, good %d, marg-skip %d)\n",
@@ -1048,12 +1052,13 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
 	}
 
+  //- Use this fh to update the inverse depth of the immature points of the key frame in the active window.
 	traceNewCoarse(fh);
 
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	// =========================== Flag Frames to be Marginalized. =========================
-	flagFramesForMarginalization(fh);
+	flagFramesForMarginalization();
 
 
 	// =========================== add New Frame to Hessian Struct. =========================
@@ -1065,7 +1070,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	setPrecalcValues();
 
-
+//	std::cout << "makeKeyFrame fh->idx: " << fh->idx << "\t fh->frameID: " << fh->frameID << std::endl;
 
 	// =========================== add new residuals for old points =========================
 	int numFwdResAdde=0;
@@ -1088,6 +1093,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 
 	// =========================== Activate Points (& flag for marginalization). =========================
+	//- 
 	activatePointsMT();
 	ef->makeIDX();
 
@@ -1223,6 +1229,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		sumID += coarseInitializer->points[0][i].iR;
 		numID++;
 	}
+	//- rescaleFactor is inverse iR average.
 	float rescaleFactor = 1 / (sumID / numID);
 
 	// randomly sub-select the points I need.
@@ -1248,6 +1255,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		if(!std::isfinite(ph->energyTH)) {delete ph; continue;}
 
 		ph->setIdepthScaled(point->iR*rescaleFactor);
+		// std::cout << "ph->idepth_scaled: " << ph->idepth_scaled << "\t ph->idepth: " << ph->idepth << std::endl;
 		ph->setIdepthZero(ph->idepth);
 		ph->hasDepthPrior=true;
 		ph->setPointStatus(PointHessian::ACTIVE);
@@ -1281,6 +1289,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 	initialized=true;
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
+	// std::cout << "And the firstFrame is the " << (firstFrame->shell->id + 1)<< "th frame." << std::endl;
 }
 
 void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
