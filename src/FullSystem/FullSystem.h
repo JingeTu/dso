@@ -136,7 +136,7 @@ public:
 	virtual ~FullSystem();
 
 	// adds a new frame, and creates point & residual structs.
-	void addActiveFrame(ImageAndExposure* image, int id);
+	void addActiveFrame(ImageAndExposure* image, ImageAndExposure* imageRight, int id);
 
 	// marginalizes a frame. drops / marginalizes points & residuals.
 	void marginalizeFrame(FrameHessian* frame);
@@ -177,7 +177,9 @@ private:
 
 	// mainPipelineFunctions
 	Vec4 trackNewCoarse(FrameHessian* fh);
-	void traceNewCoarse(FrameHessian* fh);
+	Vec4 trackNewCoarseStereo(FrameHessian* fh, FrameHessian* fhRight);
+	void traceNewCoarseKey(FrameHessian* fh);
+  void traceNewCoarseNonKey(FrameHessian* fh, FrameHessian *fhRight);
 	void activatePoints();
 	void activatePointsMT();
 	void activatePointsOldFirst();
@@ -270,6 +272,7 @@ private:
 	CoarseDistanceMap* coarseDistanceMap;
 
 	std::vector<FrameHessian*> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.
+	std::vector<FrameHessian*> frameHessiansRight;
 	std::vector<PointFrameResidual*> activeResiduals;
 	float currentMinActDist;
 
@@ -299,9 +302,9 @@ private:
  *
  */
 
-	void makeKeyFrame( FrameHessian* fh);
-	void makeNonKeyFrame( FrameHessian* fh);
-	void deliverTrackedFrame(FrameHessian* fh, bool needKF);
+	void makeKeyFrame( FrameHessian* fh, FrameHessian* fhRight);
+	void makeNonKeyFrame( FrameHessian* fh, FrameHessian* fhRight);
+	void deliverTrackedFrame(FrameHessian* fh, FrameHessian* fhRight, bool needKF);
 	void mappingLoop();
 
 	// tracking / mapping synchronization. All protected by [trackMapSyncMutex].
@@ -309,6 +312,7 @@ private:
 	boost::condition_variable trackedFrameSignal;
 	boost::condition_variable mappedFrameSignal;
 	std::deque<FrameHessian*> unmappedTrackedFrames;
+	std::deque<FrameHessian*> unmappedTrackedFramesRight;
 	int needNewKFAfter;	// Otherwise, a new KF is *needed that has ID bigger than [needNewKFAfter]*.
 	boost::thread mappingThread;
 	bool runMapping;

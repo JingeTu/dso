@@ -107,51 +107,11 @@ public:
 		this->path = path;
 		this->calibfile = calibFile;
 
-#if HAS_ZIPLIB
-		ziparchive=0;
-		databuffer=0;
-#endif
+		getdir(path, files);
 
-		isZipped = (path.length()>4 && path.substr(path.length()-4) == ".zip");
-
-
-
-
-
-		if(isZipped)
-		{
-#if HAS_ZIPLIB
-			int ziperror=0;
-			ziparchive = zip_open(path.c_str(),  ZIP_RDONLY, &ziperror);
-			if(ziperror!=0)
-			{
-				printf("ERROR %d reading archive %s!\n", ziperror, path.c_str());
-				exit(1);
-			}
-
-			files.clear();
-			int numEntries = zip_get_num_entries(ziparchive, 0);
-			for(int k=0;k<numEntries;k++)
-			{
-				const char* name = zip_get_name(ziparchive, k,  ZIP_FL_ENC_STRICT);
-				std::string nstr = std::string(name);
-				if(nstr == "." || nstr == "..") continue;
-				files.push_back(name);
-			}
-
-			printf("got %d entries and %d files!\n", numEntries, (int)files.size());
-			std::sort(files.begin(), files.end());
-#else
-			printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
-			exit(1);
-#endif
-		}
-		else
-			getdir (path, files);
-
+    isZipped = (path.length()>4 && path.substr(path.length()-4) == ".zip");
 
 		undistort = Undistort::getUndistorterForFile(calibFile, gammaFile, vignetteFile);
-
 
 		widthOrg = undistort->getOriginalSize()[0];
 		heightOrg = undistort->getOriginalSize()[1];
@@ -197,7 +157,12 @@ public:
 		Eigen::Matrix3f K;
 		getCalibMono(K, w_out, h_out);
 		setGlobalCalib(w_out, h_out, K);
+    setBaseline();
 	}
+
+  void setBaseline() {
+    baseline = undistort->baseline;
+  }
 
 	int getNumImages()
 	{

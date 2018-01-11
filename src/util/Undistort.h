@@ -87,6 +87,8 @@ public:
 
 	PhotometricUndistorter* photometricUndist;
 
+	float baseline;
+
 protected:
     int w, h, wOrg, hOrg, wUp, hUp;
     int upsampleUndistFactor;

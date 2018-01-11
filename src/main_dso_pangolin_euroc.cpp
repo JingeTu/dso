@@ -1,6 +1,6 @@
 /**
 * This file is part of DSO.
-* 
+*
 * Copyright 2016 Technical University of Munich and Intel.
 * Developed by Jakob Engel <engelj at in dot tum dot de>,
 * for more information see <http://vision.in.tum.de/dso>.
@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <chrono>
 
 #include "IOWrapper/Output3DWrapper.h"
 #include "IOWrapper/ImageDisplay.h"
@@ -49,12 +50,15 @@
 #include "IOWrapper/Pangolin/PangolinDSOViewer.h"
 #include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
+#include <opencv/cv.hpp>
+#include <opencv/highgui.h>
+
 
 std::string vignette = "";
 std::string gammaCalib = "";
 std::string source = "";
-std::string groundTruthPath = "";
 std::string calib = "";
+std::string calibRight = "";
 double rescale = 1;
 bool reverse = false;
 bool disableROS = false;
@@ -89,7 +93,6 @@ void exitThread() {
   while (true) pause();
 }
 
-
 void settingsDefault(int preset) {
   printf("\n=============== PRESET Settings: ===============\n");
   if (preset == 0 || preset == 1) {
@@ -102,12 +105,19 @@ void settingsDefault(int preset) {
 
     playbackSpeed = (preset == 0 ? 0 : 1);
     preload = preset == 1;
-    setting_desiredImmatureDensity = 1500;
-    setting_desiredPointDensity = 2000;
+
+    setting_desiredImmatureDensity = 1500;    //original 1500. set higher
+    setting_desiredPointDensity = 2000;       //original 2000
     setting_minFrames = 5;
     setting_maxFrames = 7;
     setting_maxOptIterations = 6;
     setting_minOptIterations = 1;
+
+    setting_kfGlobalWeight = 0.3;   // original is 1.0. 0.3 is a balance between speed and accuracy. if tracking lost, set this para higher
+    setting_maxShiftWeightT =
+        0.04f * (640 + 128);   // original is 0.04f * (640+480); this para is depend on the crop size.
+    setting_maxShiftWeightR = 0.04f * (640 + 128);    // original is 0.0f * (640+480);
+    setting_maxShiftWeightRT = 0.02f * (640 + 128);  // original is 0.02f * (640+480);
 
     setting_logStuff = false;
   }
@@ -137,7 +147,6 @@ void settingsDefault(int preset) {
 
   printf("==============================================\n");
 }
-
 
 void parseArgument(char *arg) {
   int option;
@@ -243,6 +252,12 @@ void parseArgument(char *arg) {
     return;
   }
 
+  if (1 == sscanf(arg, "calibRight=%s", buf)) {
+    calibRight = buf;
+    printf("loading calibration from %s!\n", calibRight.c_str());
+    return;
+  }
+
   if (1 == sscanf(arg, "vignette=%s", buf)) {
     vignette = buf;
     printf("loading vignette from %s!\n", vignette.c_str());
@@ -284,7 +299,6 @@ void parseArgument(char *arg) {
   }
 
   if (1 == sscanf(arg, "mode=%d", &option)) {
-
     mode = option;
     if (option == 0) {
       printf("PHOTOMETRIC MODE WITH CALIBRATION!\n");
@@ -305,50 +319,32 @@ void parseArgument(char *arg) {
     return;
   }
 
-  if (1 == sscanf(arg, "groundtruth=%s", buf)) {
-    groundTruthPath = buf;
-    printf("loading groundtruth file %s\n", groundTruthPath.c_str());
-    return;
-  }
-
   printf("could not parse argument \"%s\"!!!!\n", arg);
 }
 
-
 int main(int argc, char **argv) {
   //setlocale(LC_ALL, "");
+
   for (int i = 1; i < argc; i++)
     parseArgument(argv[i]);
 
   // hook crtl+C.
   boost::thread exThread = boost::thread(exitThread);
 
-
-  ImageFolderReader *reader = new ImageFolderReader(source + "/image_0", calib, gammaCalib, vignette);
-  ImageFolderReader *readerRight = new ImageFolderReader(source + "/image_1", calib, gammaCalib, vignette);
+  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data", calib, gammaCalib, vignette);
+  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data", calibRight, gammaCalib, vignette);
   reader->setGlobalCalibration();
-  readerRight->setGlobalCalibration();
-
+  reader_right->setGlobalCalibration();
 
   if (setting_photometricCalibration > 0 && reader->getPhotometricGamma() == 0) {
     printf("ERROR: dont't have photometric calibation. Need to use commandline options mode=1 or mode=2 ");
     exit(1);
   }
 
-
   int lstart = start;
   int lend = end;
-  int linc = 1;
-  if (reverse) {
-    printf("REVERSE!!!!");
-    lstart = end - 1;
-    if (lstart >= reader->getNumImages())
-      lstart = reader->getNumImages() - 1;
-    lend = start;
-    linc = -1;
-  }
 
-
+  // build system
   FullSystem *fullSystem = new FullSystem();
   fullSystem->setGammaFunction(reader->getPhotometricGamma());
   fullSystem->linearizeOperation = (playbackSpeed == 0);
@@ -356,8 +352,7 @@ int main(int argc, char **argv) {
 
   IOWrap::PangolinDSOViewer *viewer = 0;
   if (!disableAllDisplay) {
-    //- add ground truth filepath to PangolinDSOViewer
-    viewer = new IOWrap::PangolinDSOViewer(wG[0], hG[0], groundTruthPath, false);
+    viewer = new IOWrap::PangolinDSOViewer(wG[0], hG[0], "", false);
     fullSystem->outputWrapper.push_back(viewer);
   }
 
@@ -365,17 +360,15 @@ int main(int argc, char **argv) {
   if (useSampleOutput)
     fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
 
-
-
-  //- MacOS can just modify the graphics in the main thread.
-  //- So here fork another thread to do the calculation.
   // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
   std::thread runthread([&]() {
-    std::vector<int> idsToPlay;
+    std::vector<int> idsToPlay;        // left images
     std::vector<double> timesToPlayAt;
 
-    std::vector<int> idsToPlayRight;
+    std::vector<int> idsToPlayRight;    // right images
     std::vector<double> timesToPlayAtRight;
+
+    int linc = 1;
 
     for (int i = lstart; i >= 0 && i < reader->getNumImages() && linc * i < linc * lend; i += linc) {
       idsToPlay.push_back(i);
@@ -387,32 +380,31 @@ int main(int argc, char **argv) {
         timesToPlayAt.push_back(timesToPlayAt.back() + fabs(tsThis - tsPrev) / playbackSpeed);
       }
     }
-    for (int i = lstart; i >= 0 && i < readerRight->getNumImages() && linc * i < linc * lend; i += linc) {
+
+    for (int i = lstart; i >= 0 && i < reader_right->getNumImages() && linc * i < linc * lend; i += linc) {
       idsToPlayRight.push_back(i);
       if (timesToPlayAtRight.size() == 0) {
         timesToPlayAtRight.push_back((double) 0);
       } else {
-        double tsThis = readerRight->getTimestamp(idsToPlayRight[idsToPlayRight.size() - 1]);
-        double tsPrev = readerRight->getTimestamp(idsToPlayRight[idsToPlayRight.size() - 2]);
+        double tsThis = reader_right->getTimestamp(idsToPlay[idsToPlay.size() - 1]);
+        double tsPrev = reader_right->getTimestamp(idsToPlay[idsToPlay.size() - 2]);
         timesToPlayAtRight.push_back(timesToPlayAtRight.back() + fabs(tsThis - tsPrev) / playbackSpeed);
       }
     }
 
 
-    std::vector<ImageAndExposure *> preloadedImages;
+    std::vector<ImageAndExposure *> preloadedImagesLeft;
     std::vector<ImageAndExposure *> preloadedImagesRight;
     if (preload) {
       printf("LOADING ALL IMAGES!\n");
       for (int ii = 0; ii < (int) idsToPlay.size(); ii++) {
         int i = idsToPlay[ii];
-        preloadedImages.push_back(reader->getImage(i));
-      }
-      for (int ii = 0; ii < (int) idsToPlayRight.size(); ii++) {
-        int i = idsToPlayRight[ii];
-        preloadedImagesRight.push_back(readerRight->getImage(i));
+        preloadedImagesLeft.push_back(reader->getImage(i));
+        preloadedImagesRight.push_back(reader_right->getImage(i));
       }
     }
 
+    // timing
     struct timeval tv_start;
     gettimeofday(&tv_start, NULL);
     clock_t started = clock();
@@ -429,21 +421,16 @@ int main(int argc, char **argv) {
 
       int i = idsToPlay[ii];
 
-      //- Preloaded images from disk, save time here. The Frequencey can be 25Hz.
-      //- If not, just 11Hz.
-      //- ImageFolderReader::getImage() is to get image from the file, and do the
-      //- photometric rectification. The ImageAndExposure::image is the radiance value.
-      ImageAndExposure *img;
-      ImageAndExposure *imgRight;
-      if (preload) {
-        img = preloadedImages[ii];
-        imgRight = preloadedImagesRight[ii];
-      }
-      else {
-        img = reader->getImage(i);
-        imgRight = readerRight->getImage(i);
-      }
 
+      ImageAndExposure *img_left;
+      ImageAndExposure *img_right;
+      if (preload) {
+        img_left = preloadedImagesLeft[ii];
+        img_right = preloadedImagesRight[ii];
+      } else {
+        img_left = reader->getImage(i);
+        img_right = reader_right->getImage(i);
+      }
 
       bool skipFrame = false;
       if (playbackSpeed != 0) {
@@ -460,14 +447,31 @@ int main(int argc, char **argv) {
         }
       }
 
+      // if MODE_SLAM is true, it runs slam.
+      bool MODE_SLAM = true;
+      // if MODE_STEREOMATCH is true, it does stereo matching and output idepth image.
+      bool MODE_STEREOMATCH = false;
 
-      //- Here is the entry to the system.
-      if (!skipFrame) fullSystem->addActiveFrame(img, imgRight, i);
+      if (MODE_SLAM) {
+        if (!skipFrame) fullSystem->addActiveFrame(img_left, img_right, i);
+      }
 
+//      if (MODE_STEREOMATCH) {
+//        std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+//
+//        cv::Mat idepthMap(img_left->h, img_left->w, CV_32FC3, cv::Scalar(0, 0, 0));
+//        cv::Mat &idepth_temp = idepthMap;
+//        fullSystem->stereoMatch(img_left, img_right, i, idepth_temp);
+//
+//        std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+//        double ttStereoMatch = std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count();
+//        std::cout << " casting time " << ttStereoMatch << std::endl;
+//      }
 
-      delete img;
-      delete imgRight;
+      delete img_left;
+      delete img_right;
 
+      // initializer fail
       if (fullSystem->initFailed || setting_fullResetRequested) {
         if (ii < 250 || setting_fullResetRequested) {
           printf("RESETTING!\n");
@@ -494,6 +498,8 @@ int main(int argc, char **argv) {
       }
 
     }
+
+
     fullSystem->blockUntilMappingIsFinished();
     clock_t ended = clock();
     struct timeval tv_end;
@@ -543,7 +549,6 @@ int main(int argc, char **argv) {
     ow->join();
     delete ow;
   }
-
 
   printf("DELETE FULLSYSTEM!\n");
   delete fullSystem;

@@ -56,7 +56,7 @@ class PangolinDSOViewer : public Output3DWrapper
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    PangolinDSOViewer(int w, int h, bool startRunThread=true);
+    PangolinDSOViewer(int w, int h, const std::string &groundTruthPath, bool startRunThread=true);
 	virtual ~PangolinDSOViewer();
 
 	void run();
@@ -117,6 +117,7 @@ private:
 	bool settings_showFullTrajectory;
 	bool settings_showActiveConstraints;
 	bool settings_showAllConstraints;
+  bool settings_showGroundTruth;
 
 	float settings_scaledVarTH;
 	float settings_absVarTH;
@@ -132,6 +133,8 @@ private:
 
 	std::deque<float> lastNTrackingMs;
 	std::deque<float> lastNMappingMs;
+
+  std::vector<Mat34f> groundTruthPs;
 };
 
 

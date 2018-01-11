@@ -39,7 +39,7 @@ namespace IOWrap
 
 
 
-PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
+PangolinDSOViewer::PangolinDSOViewer(int w, int h, const std::string &groundTruthPath, bool startRunThread)
 {
 	this->w = w;
 	this->h = h;
@@ -58,6 +58,28 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
 		internalResImg->setBlack();
 	}
 
+	if (groundTruthPath != "")
+	{
+		// read ground truth from the groundTruthPath
+		std::ifstream f(groundTruthPath.c_str());
+		std::string l;
+		Mat34f P;
+		size_t poseNum = 0;
+		while (std::getline(f, l)) poseNum++;
+
+    f.clear();
+		f.seekg(0, std::ios::beg);
+
+		groundTruthPs.reserve(poseNum);
+
+		while (std::getline(f, l)) {
+			if (sscanf(l.c_str(), "%f %f %f %f %f %f %f %f %f %f %f %f",
+								 &P(0,0), &P(0,1), &P(0,2), &P(0,3),
+								 &P(1,0), &P(1,1), &P(1,2), &P(1,3),
+								 &P(2,0), &P(2,1), &P(2,2), &P(2,3)) == 12)
+				groundTruthPs.push_back(P);
+		}
+	}
 
 	{
 		currentCam = new KeyFrameDisplay();
@@ -130,6 +152,7 @@ void PangolinDSOViewer::run()
 	pangolin::Var<bool> settings_showCurrentCamera("ui.CurrCam",true,true);
 	pangolin::Var<bool> settings_showTrajectory("ui.Trajectory",true,true);
 	pangolin::Var<bool> settings_showFullTrajectory("ui.FullTrajectory",false,true);
+	pangolin::Var<bool> settings_showGroundTruth("ui.GroundTruth", false, true);
 	pangolin::Var<bool> settings_showActiveConstraints("ui.ActiveConst",true,true);
 	pangolin::Var<bool> settings_showAllConstraints("ui.AllConst",false,true);
 
@@ -193,6 +216,7 @@ void PangolinDSOViewer::run()
 
 
 
+
 		openImagesMutex.lock();
 		if(videoImgChanged) 	texVideo.Upload(internalVideoImg->data,GL_BGR,GL_UNSIGNED_BYTE);
 		if(kfImgChanged) 		texKFDepth.Upload(internalKFImg->data,GL_BGR,GL_UNSIGNED_BYTE);
@@ -251,6 +275,7 @@ void PangolinDSOViewer::run()
 	    this->settings_showKFCameras = settings_showKFCameras.Get();
 	    this->settings_showTrajectory = settings_showTrajectory.Get();
 	    this->settings_showFullTrajectory = settings_showFullTrajectory.Get();
+		this->settings_showGroundTruth = settings_showGroundTruth.Get();
 
 		setting_render_display3D = settings_show3D.Get();
 		setting_render_displayDepth = settings_showLiveDepth.Get();
@@ -395,6 +420,25 @@ void PangolinDSOViewer::drawConstraints()
 					(float)keyframes[i]->camToWorld.translation()[2]);
 		}
 		glEnd();
+	}
+
+	if(settings_showGroundTruth)
+	{
+		float colorYellow[3] = {1, 1, 0};
+		glColor3f(colorYellow[0], colorYellow[1], colorYellow[2]);
+		glLineWidth(3);
+
+		glBegin(GL_LINE_STRIP);
+		for (unsigned int i = 0; i < groundTruthPs.size(); i++)
+		{
+      float x = groundTruthPs[i](0,3);
+      float y = groundTruthPs[i](1,3);
+      float z = groundTruthPs[i](2,3);
+			glVertex3f(groundTruthPs[i](0,3),
+								 groundTruthPs[i](1,3),
+								 groundTruthPs[i](2,3));
+			glEnd();
+		}
 	}
 
 	if(settings_showFullTrajectory)

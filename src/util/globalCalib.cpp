@@ -38,6 +38,7 @@ namespace dso
 
 	Eigen::Matrix3f KG[PYR_LEVELS], KiG[PYR_LEVELS];
 
+	float baseline;
 
 	float wM3G;
 	float hM3G;

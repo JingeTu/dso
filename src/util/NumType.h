@@ -131,6 +131,7 @@ typedef Eigen::Matrix<float,10,1> Vec10f;
 typedef Eigen::Matrix<float,6,6> Mat66f;
 typedef Eigen::Matrix<float,4,1> Vec4f;
 typedef Eigen::Matrix<float,4,4> Mat44f;
+typedef Eigen::Matrix<float,3,4> Mat34f;
 typedef Eigen::Matrix<float,12,12> Mat1212f;
 typedef Eigen::Matrix<float,12,1> Vec12f;
 typedef Eigen::Matrix<float,13,13> Mat1313f;

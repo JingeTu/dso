@@ -1,5 +1,9 @@
 I just do some notes here, for the convenience of my understanding.
 
+Add code snippets from https://github.com/HorizonAD/stereo_dso, make this stereo.
+
+Add support for kitti and euroc.
+
 # DSO: Direct Sparse Odometry
 
 For more information see
