@@ -73,7 +73,7 @@ namespace dso {
 
     float my_type;
 
-    float idepthStereo;
+    float idepth_stereo;
 
     float idepth_min;
     float idepth_max;
@@ -88,7 +88,7 @@ namespace dso {
 
     ImmaturePointStatus traceOn(FrameHessian *frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt,
                                 const Vec2f &hostToFrame_affine, CalibHessian *HCalib, bool debugPrint = false);
-    ImmaturePointStatus traceStereo(FrameHessian* frame, Mat33f K, bool modeRight);
+    ImmaturePointStatus traceStereo(FrameHessian *frame, Mat33f K, bool modeRight);
     ImmaturePointStatus lastTraceStatus;
     Vec2f lastTraceUV;
     float lastTracePixelInterval;

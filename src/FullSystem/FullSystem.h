@@ -40,6 +40,8 @@
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "FullSystem/PixelSelector2.h"
 
+#include <opencv2/opencv.hpp>
+
 #include <math.h>
 
 namespace dso
@@ -138,6 +140,7 @@ public:
 	// adds a new frame, and creates point & residual structs.
 	void addActiveFrame(ImageAndExposure* image, ImageAndExposure* imageRight, int id);
 
+	void stereoMatch(ImageAndExposure *image, ImageAndExposure *image_right, int id, cv::Mat &idepthMap);
 	// marginalizes a frame. drops / marginalizes points & residuals.
 	void marginalizeFrame(FrameHessian* frame);
 	void blockUntilMappingIsFinished();
@@ -172,8 +175,6 @@ private:
 	// opt single point
 	int optimizePoint(PointHessian* point, int minObs, bool flagOOB);
 	PointHessian* optimizeImmaturePoint(ImmaturePoint* point, int minObs, ImmaturePointTemporaryResidual* residuals);
-
-	double linAllPointSinle(PointHessian* point, float outlierTHSlack, bool plot);
 
 	// mainPipelineFunctions
 	Vec4 trackNewCoarse(FrameHessian* fh);

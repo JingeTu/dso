@@ -4,6 +4,8 @@ Add code snippets from https://github.com/HorizonAD/stereo_dso, make this stereo
 
 Add support for kitti and euroc.
 
+You should rectify euroc dataset first. Then put them into the system. Because the system don't align the two images. It only rectifies them.
+
 # DSO: Direct Sparse Odometry
 
 For more information see

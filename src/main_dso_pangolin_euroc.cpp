@@ -331,8 +331,8 @@ int main(int argc, char **argv) {
   // hook crtl+C.
   boost::thread exThread = boost::thread(exitThread);
 
-  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data", calib, gammaCalib, vignette);
-  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data", calibRight, gammaCalib, vignette);
+  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data_rec", calib, gammaCalib, vignette);
+  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data_rec", calibRight, gammaCalib, vignette);
   reader->setGlobalCalibration();
   reader_right->setGlobalCalibration();
 
@@ -447,6 +447,17 @@ int main(int argc, char **argv) {
         }
       }
 
+//      cv::Mat matLeft(img_left->h, img_left->w, CV_32F, img_left->image);
+//      cv::Mat matRight(img_right->h, img_right->w, CV_32F, img_right->image);
+//
+//      cv::imshow("left", matLeft / 254.0f);
+//      cv::imshow("right", matRight / 254.0f);
+
+//      cv::Mat matMatches;
+//      cv::drawMatches(matLeft, keypoints_left, matRight, keypoints_right, matches, matMatches);
+//      cv::imshow("matches", matMatches);
+//      cv::waitKey(0);
+
       // if MODE_SLAM is true, it runs slam.
       bool MODE_SLAM = true;
       // if MODE_STEREOMATCH is true, it does stereo matching and output idepth image.
@@ -456,17 +467,17 @@ int main(int argc, char **argv) {
         if (!skipFrame) fullSystem->addActiveFrame(img_left, img_right, i);
       }
 
-//      if (MODE_STEREOMATCH) {
-//        std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
-//
-//        cv::Mat idepthMap(img_left->h, img_left->w, CV_32FC3, cv::Scalar(0, 0, 0));
-//        cv::Mat &idepth_temp = idepthMap;
-//        fullSystem->stereoMatch(img_left, img_right, i, idepth_temp);
-//
-//        std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-//        double ttStereoMatch = std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count();
-//        std::cout << " casting time " << ttStereoMatch << std::endl;
-//      }
+      if (MODE_STEREOMATCH) {
+        std::chrono::steady_clock::time_point t0 = std::chrono::steady_clock::now();
+
+        cv::Mat idepthMap(img_left->h, img_left->w, CV_32FC3, cv::Scalar(0, 0, 0));
+        cv::Mat &idepth_temp = idepthMap;
+        fullSystem->stereoMatch(img_left, img_right, i, idepth_temp);
+
+        std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
+        double ttStereoMatch = std::chrono::duration_cast<std::chrono::duration<double>>(t1 - t0).count();
+        std::cout << " casting time " << ttStereoMatch << std::endl;
+      }
 
       delete img_left;
       delete img_right;

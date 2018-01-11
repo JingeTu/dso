@@ -65,8 +65,9 @@ namespace dso {
   ImmaturePoint::~ImmaturePoint() {
   }
 
+  /*
   // modeRight == true, from left to right, modeRight == false, from right to left
-  ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frame, Mat33f K, bool modeRight) {
+  ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frameRight, Mat33f K, bool modeRight) {
     // KRKi
     Mat33f KRKi = Mat33f::Identity().cast<float>();
     // Kt
@@ -152,13 +153,13 @@ namespace dso {
       assert(dist > 0);
     }
 
-    //- Horizon write this, no idea what this does.
-//    // set OOB if scale change too big.
-//    if (!(idepth_min < 0 || (ptpMin[2] > 0.75 && ptpMin[2] < 1.5))) { //- ptpMin[2] is the depth here. min for idepth, so the depth is max.
-//      lastTraceUV = Vec2f(-1, -1);
-//      lastTracePixelInterval = 0;
-//      return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
-//    }
+    // set OOB if scale change too big.
+    if (!(idepth_min < 0 || (ptpMin[2] > 0.75 &&
+                             ptpMin[2] < 1.5))) { //- ptpMin[2] is the depth here. min for idepth, so the depth is max.
+      lastTraceUV = Vec2f(-1, -1);
+      lastTracePixelInterval = 0;
+      return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+    }
 
     // ============== compute error-bounds on result in pixel. if the new interval is not at least 1/2 of the old, SKIP ===================
     //- Don't know what a, b means. Very sorry.
@@ -194,9 +195,9 @@ namespace dso {
     float pty = vMin - randShift * dy;
 
 
-    Vec2f rotatePattern[MAX_RES_PER_POINT];
-    for (int idx = 0; idx < patternNum; idx++)
-      rotatePattern[idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
+    Vec2f rotatePattern[patternNumNCC];
+    for (int idx = 0; idx < patternNumNCC; idx++)
+      rotatePattern[idx] = Rplane * Vec2f(patternNCC[idx][0], patternNCC[idx][1]);
 
     if (!std::isfinite(dx) || !std::isfinite(dy)) {
       lastTraceUV = Vec2f(-1, -1);
@@ -209,16 +210,26 @@ namespace dso {
     int bestIdx = -1;
     if (numSteps >= 100) numSteps = 99;
 
+    //- Get patternHost from host
+    using Vec15f = Eigen::Matrix<float, 15, 1>;
+    Vec15f patternHost;
+    for (int idx = 0; idx < patternNumNCC; idx++)
+      patternHost[idx] = host->dI[(int) (u_stereo + v_stereo * wG[0] + 0.5)][0];
+
+    patternHost.normalize();
+
     //- Do step searches for the GN optimization initial state.
     for (int i = 0; i < numSteps; i++) {
       float energy = 0;
-      for (int idx = 0; idx < patternNum; idx++) {
 
-        float hitColor = getInterpolatedElement31(frame->dI,
+      Vec15f patternTarget;
+      for (int idx = 0; idx < patternNumNCC; idx++) {
+
+        float hitColor = getInterpolatedElement31(frameRight->dI,
                                                   (float) (ptx + rotatePattern[idx][0]),
                                                   (float) (pty + rotatePattern[idx][1]),
                                                   wG[0]);
-
+//        patternTarget[idx] = hitColor;
         if (!std::isfinite(hitColor)) {
           energy += 1e5;
           continue;
@@ -227,6 +238,10 @@ namespace dso {
         float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual); // settings_huberTH == 9
         energy += hw * residual * residual * (2 - hw);
       }
+
+//      patternTarget.normalize();
+
+      energy = 1.0f - patternHost.dot(patternTarget.transpose());
 
       errors[i] = energy;
       if (energy < bestEnergy) {
@@ -256,9 +271,12 @@ namespace dso {
     if (setting_trace_GNIterations > 0) bestEnergy = 1e5;
     int gnStepsGood = 0, gnStepsBad = 0;
     for (int it = 0; it < setting_trace_GNIterations; it++) {
-      float H = 1, b = 0, energy = 0;
-      for (int idx = 0; idx < patternNum; idx++) {
-        Vec3f hitColor = getInterpolatedElement33(frame->dI,
+      float H = 1, b = 0, energy = 0, J = 0;
+      Vec15f patternTarget;
+      Vec15f gxTarget;
+      Vec15f gyTarget;
+      for (int idx = 0; idx < patternNumNCC; idx++) {
+        Vec3f hitColor = getInterpolatedElement33(frameRight->dI,
                                                   (float) (bestU + rotatePattern[idx][0]),
                                                   (float) (bestV + rotatePattern[idx][1]), wG[0]);
 
@@ -273,8 +291,21 @@ namespace dso {
         H += hw * dResdDist * dResdDist;
         b += hw * residual * dResdDist;
         energy += weights[idx] * weights[idx] * hw * residual * residual * (2 - hw);
+
+//        patternTarget[idx] = hitColor[0];
+//        gxTarget[idx] = hitColor[1];
+//        gyTarget[idx] = hitColor[2];
       }
 
+//      float normTarget = patternTarget.norm();
+//
+//      for (int idx = 0; idx < patternNumNCC; idx++) {
+//        J += -(1.0f / normTarget - (patternTarget[idx] * patternTarget[idx]) / (normTarget * normTarget * normTarget))
+//            * (gxTarget[idx] * dx + gyTarget[idx] * dy);
+//      }
+//
+//      H = J * J;
+//      b = J * (patternTarget.dot(patternHost) / normTarget);
 
       if (energy > bestEnergy) {
         gnStepsBad++;
@@ -333,10 +364,309 @@ namespace dso {
 
     lastTracePixelInterval = 2 * errorInPixel;
     lastTraceUV = Vec2f(bestU, bestV);
-    idepthStereo = (u_stereo - bestU) / bf;
+    idepth_stereo = (u_stereo - bestU) / bf;
     return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
   }
+*/
 
+  // modeRight == true, from left to right, modeRight == false, from right to left
+  ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frameRight, Mat33f K, bool modeRight) {
+
+    // KRKi
+    Mat33f KRKi = Mat33f::Identity().cast<float>();
+    // Kt
+    Vec3f Kt;
+    // T between stereo cameras
+    Vec3f bl;
+
+    if(modeRight)
+    {
+      bl << -baseline, 0, 0;
+    }else{
+      bl << baseline, 0, 0;
+    }
+
+    Kt = K*bl;
+    // to simplify set aff 1, 0
+    Vec2f aff;
+    aff << 1, 0;
+
+    // baseline * fx
+    float bf = -K(0,0)*bl[0];
+
+    Vec3f pr = KRKi * Vec3f(u_stereo,v_stereo, 1);
+    Vec3f ptpMin = pr +Kt * idepth_min_stereo;
+
+    float uMax = ptpMin[0] / ptpMin[2];
+    float vMax = ptpMin[1] / ptpMin[2];
+
+    if(!(uMax > 4 && vMax > 4 && uMax < wG[0]-5 && vMax < hG[0]-5))
+    {
+      lastTraceUV = Vec2f(-1,-1);
+      lastTracePixelInterval=0;
+      return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+    }
+
+    float dist;
+    float uMin;
+    float vMin;
+    Vec3f ptpMax;
+    float maxPixSearch = (wG[0]+hG[0])*setting_maxPixSearch;
+
+    if(std::isfinite(idepth_max_stereo))
+    {
+      ptpMax = pr + Kt*idepth_max_stereo;
+      uMin = ptpMax[0] / ptpMax[2];
+      vMin = ptpMax[1] / ptpMax[2];
+
+
+      if(!(uMin > 4 && vMin > 4 && uMin < wG[0]-5 && vMin < hG[0]-5))
+      {
+        lastTraceUV = Vec2f(-1,-1);
+        lastTracePixelInterval=0;
+        return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+      }
+
+      // ============== check their distance. everything below 2px is OK (-> skip). ===================
+      dist = (uMax-uMin)*(uMax-uMin) + (vMax-vMin)*(vMax-vMin);
+      dist = sqrtf(dist);
+      if(dist < setting_trace_slackInterval)
+        return lastTraceStatus = ImmaturePointStatus ::IPS_SKIPPED;
+      assert(dist>0);
+    }
+    else
+    {
+      dist = maxPixSearch;
+
+      // project to arbitrary depth to get direction.
+      ptpMax = pr + Kt*0.01;
+      uMin = ptpMax[0] / ptpMax[2];
+      vMin = ptpMax[1] / ptpMax[2];
+
+      // direction.
+      float dx = uMin-uMax;
+      float dy = vMin-vMax;
+      float d = 1.0f / sqrtf(dx*dx+dy*dy);
+
+      // set to [setting_maxPixSearch].
+      uMin = uMax + dist*dx*d;
+      vMin = vMax + dist*dy*d;
+
+      // may still be out!
+      if(!(uMin > 4 && vMin > 4 && uMin < wG[0]-5 && vMin < hG[0]-5))
+      {
+        lastTraceUV = Vec2f(-1,-1);
+        lastTracePixelInterval=0;
+        return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+      }
+      assert(dist>0);
+    }
+
+//		 set OOB if scale change too big.
+    if(!(idepth_min<0 || (ptpMin[2]>0.75 && ptpMin[2]<1.5)))
+    {
+      lastTraceUV = Vec2f(-1, -1);
+      lastTracePixelInterval = 0;
+      return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+    }
+
+    // ============== compute error-bounds on result in pixel. if the new interval is not at least 1/2 of the old, SKIP ===================
+    float dx = setting_trace_stepsize*(uMin-uMax);
+    float dy = setting_trace_stepsize*(vMin-vMax);
+
+    float a = (Vec2f(dx,dy).transpose() * gradH * Vec2f(dx,dy));
+    float b = (Vec2f(dy,-dx).transpose() * gradH * Vec2f(dy,-dx));
+    float errorInPixel = 0.2f + 0.2f * (a+b) / a;
+
+    if(errorInPixel*setting_trace_minImprovementFactor > dist && std::isfinite(idepth_max_stereo))
+    {
+//			lastTraceUV_Stereo = Vec2f(uMin+uMax, vMin+vMax)*0.5;
+//			lastTracePixelInterval_Stereo=dist;
+//			idepth_stereo = (u_stereo - 0.5*(uMin+uMax))/bf;
+//			return lastTraceStatus_Stereo = ImmaturePointStatus::IPS_BADCONDITION;
+//            lastTraceUV = Vec2f(u, v);
+//            lastTracePixelInterval = dist;
+      return lastTraceStatus = ImmaturePointStatus ::IPS_BADCONDITION;
+    }
+
+    if(errorInPixel >10) errorInPixel=10;
+
+    // ============== do the discrete search ===================
+    dx /= dist;
+    dy /= dist;
+
+    if(dist>maxPixSearch)
+    {
+      uMin = uMax + maxPixSearch*dx;
+      vMin = vMax + maxPixSearch*dy;
+      dist = maxPixSearch;
+    }
+
+    int numSteps = 1.9999f + dist / setting_trace_stepsize;
+    Mat22f Rplane = KRKi.topLeftCorner<2,2>();
+
+    float randShift = uMax*1000-floorf(uMax*1000);
+    float ptx = uMax-randShift*dx;
+    float pty = vMax-randShift*dy;
+
+
+    Vec2f rotatetPattern[MAX_RES_PER_POINT];
+    for(int idx=0;idx<patternNum;idx++)
+      rotatetPattern[idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
+
+    if(!std::isfinite(dx) || !std::isfinite(dy))
+    {
+      lastTraceUV = Vec2f(-1,-1);
+      lastTracePixelInterval=0;
+      return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+    }
+
+    float errors[100];
+    float bestU=0, bestV=0, bestEnergy=1e10;
+    int bestIdx=-1;
+    if(numSteps >= 100) numSteps = 99;
+
+    for(int i=0;i<numSteps;i++)
+    {
+      float energy=0;
+      for(int idx=0;idx<patternNum;idx++)
+      {
+
+        float hitColor = getInterpolatedElement31(frameRight->dI,
+                                                  (float)(ptx+rotatetPattern[idx][0]),
+                                                  (float)(pty+rotatetPattern[idx][1]),
+                                                  wG[0]);
+
+        if(!std::isfinite(hitColor)) {energy+=1e5; continue;}
+        float residual = hitColor - (float)(aff[0] * color[idx] + aff[1]);
+        float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+//        energy += hw *residual*residual*(2-hw);
+        energy += residual * residual;
+      }
+
+      errors[i] = energy;
+      if(energy < bestEnergy)
+      {
+        bestU = ptx;
+        bestV = pty;
+        bestEnergy = energy;
+        bestIdx = i;
+      }
+
+      ptx+=dx;
+      pty+=dy;
+    }
+
+    // find best score outside a +-2px radius.
+    float secondBest=1e10;
+    for(int i=0;i<numSteps;i++)
+    {
+      if((i < bestIdx-setting_minTraceTestRadius || i > bestIdx+setting_minTraceTestRadius) && errors[i] < secondBest)
+        secondBest = errors[i];
+    }
+    float newQuality = secondBest / bestEnergy;
+    if(newQuality < quality || numSteps > 10) quality = newQuality;
+
+
+    // ============== do GN optimization ===================
+    float uBak=bestU, vBak=bestV, gnstepsize=1, stepBack=0;
+    if(setting_trace_GNIterations>0) bestEnergy = 1e5;
+    int gnStepsGood=0, gnStepsBad=0;
+    for(int it=0;it<setting_trace_GNIterations;it++)
+    {
+      float H = 1, b=0, energy=0;
+      for(int idx=0;idx<patternNum;idx++)
+      {
+        Vec3f hitColor = getInterpolatedElement33(frameRight->dI,
+                                                  (float)(bestU+rotatetPattern[idx][0]),
+                                                  (float)(bestV+rotatetPattern[idx][1]),wG[0]);
+
+        if(!std::isfinite((float)hitColor[0])) {energy+=1e5; continue;}
+        float residual = hitColor[0] - (aff[0] * color[idx] + aff[1]);
+        float dResdDist = dx*hitColor[1] + dy*hitColor[2];
+        float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+
+//        H += hw*dResdDist*dResdDist;
+//        b += hw*residual*dResdDist;
+//        energy += weights[idx]*weights[idx]*hw *residual*residual*(2-hw);
+        H += dResdDist * dResdDist;
+        b += residual * dResdDist;
+        energy += residual * residual;
+      }
+
+
+      if(energy > bestEnergy)
+      {
+        gnStepsBad++;
+
+        // do a smaller step from old point.
+        stepBack*=0.5;
+        bestU = uBak + stepBack*dx;
+        bestV = vBak + stepBack*dy;
+      }
+      else
+      {
+        gnStepsGood++;
+
+        float step = -gnstepsize*b/H;
+        if(step < -0.5) step = -0.5;
+        else if(step > 0.5) step=0.5;
+
+        if(!std::isfinite(step)) step=0;
+
+        uBak=bestU;
+        vBak=bestV;
+        stepBack=step;
+
+        bestU += step*dx;
+        bestV += step*dy;
+        bestEnergy = energy;
+
+      }
+
+      if(fabsf(stepBack) < setting_trace_GNThreshold) break;
+    }
+
+    if(!(bestEnergy < energyTH*setting_trace_extraSlackOnTH))
+    {
+
+      lastTracePixelInterval=0;
+      lastTraceUV = Vec2f(-1,-1);
+      if(lastTraceStatus == ImmaturePointStatus::IPS_OUTLIER)
+        return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+      else
+        return lastTraceStatus = ImmaturePointStatus::IPS_OUTLIER;
+    }
+
+    // ============== set new interval ===================
+    if(dx*dx>dy*dy)
+    {
+      idepth_min_stereo = (pr[2]*(bestU-errorInPixel*dx) - pr[0]) / (Kt[0] - Kt[2]*(bestU-errorInPixel*dx));
+      idepth_max_stereo = (pr[2]*(bestU+errorInPixel*dx) - pr[0]) / (Kt[0] - Kt[2]*(bestU+errorInPixel*dx));
+    }
+    else
+    {
+      idepth_min_stereo = (pr[2]*(bestV-errorInPixel*dy) - pr[1]) / (Kt[1] - Kt[2]*(bestV-errorInPixel*dy));
+      idepth_max_stereo = (pr[2]*(bestV+errorInPixel*dy) - pr[1]) / (Kt[1] - Kt[2]*(bestV+errorInPixel*dy));
+    }
+    if(idepth_min_stereo > idepth_max_stereo) std::swap<float>(idepth_min_stereo, idepth_max_stereo);
+
+//  printf("the idpeth_min is %f, the idepth_max is %f \n", idepth_min, idepth_max);
+
+    if(!std::isfinite(idepth_min_stereo) || !std::isfinite(idepth_max_stereo) || (idepth_max_stereo<0))
+    {
+      lastTracePixelInterval=0;
+      lastTraceUV = Vec2f(-1,-1);
+      return lastTraceStatus = ImmaturePointStatus::IPS_OUTLIER;
+    }
+
+//    std::cout << "v_stereo: " << v_stereo << "\tu_stereo - bestU : " << u_stereo - bestU << std::endl;
+
+    lastTracePixelInterval=2*errorInPixel;
+    lastTraceUV = Vec2f(bestU, bestV);
+    idepth_stereo = (u_stereo - bestU)/bf;
+    return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
+  }
 
 /*
  * returns
@@ -369,30 +699,30 @@ namespace dso {
     // ============== project min and max. return if one of them is OOB ===================
     Vec3f pr = hostToFrame_KRKi * Vec3f(u, v, 1);
     Vec3f ptpMin = pr + hostToFrame_Kt * idepth_min;
-    float uMin = ptpMin[0] / ptpMin[2];
-    float vMin = ptpMin[1] / ptpMin[2];
+    float uMax = ptpMin[0] / ptpMin[2];
+    float vMax = ptpMin[1] / ptpMin[2];
 
-    if (!(uMin > 4 && vMin > 4 && uMin < wG[0] - 5 && vMin < hG[0] - 5)) {
+    if (!(uMax > 4 && vMax > 4 && uMax < wG[0] - 5 && vMax < hG[0] - 5)) {
       if (debugPrint)
-        printf("OOB uMin %f %f - %f %f %f (id %f-%f)!\n",
-               u, v, uMin, vMin, ptpMin[2], idepth_min, idepth_max);
+        printf("OOB uMax %f %f - %f %f %f (id %f-%f)!\n",
+               u, v, uMax, vMax, ptpMin[2], idepth_min, idepth_max);
       lastTraceUV = Vec2f(-1, -1);
       lastTracePixelInterval = 0;
       return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
     }
 
     float dist;
-    float uMax;
-    float vMax;
+    float uMin;
+    float vMin;
     Vec3f ptpMax;
     if (std::isfinite(idepth_max)) {
       ptpMax = pr + hostToFrame_Kt * idepth_max;
-      uMax = ptpMax[0] / ptpMax[2];
-      vMax = ptpMax[1] / ptpMax[2];
+      uMin = ptpMax[0] / ptpMax[2];
+      vMin = ptpMax[1] / ptpMax[2];
 
 
-      if (!(uMax > 4 && vMax > 4 && uMax < wG[0] - 5 && vMax < hG[0] - 5)) {
-        if (debugPrint) printf("OOB uMax  %f %f - %f %f!\n", u, v, uMax, vMax);
+      if (!(uMin > 4 && vMin > 4 && uMin < wG[0] - 5 && vMin < hG[0] - 5)) {
+        if (debugPrint) printf("OOB uMin  %f %f - %f %f!\n", u, v, uMin, vMin);
         lastTraceUV = Vec2f(-1, -1);
         lastTracePixelInterval = 0;
         return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
@@ -401,13 +731,13 @@ namespace dso {
 
 
       // ============== check their distance. everything below 2px is OK (-> skip). ===================
-      dist = (uMin - uMax) * (uMin - uMax) + (vMin - vMax) * (vMin - vMax);
+      dist = (uMax - uMin) * (uMax - uMin) + (vMax - vMin) * (vMax - vMin);
       dist = sqrtf(dist);
       if (dist < setting_trace_slackInterval) {
         if (debugPrint)
           printf("TOO CERTAIN ALREADY (dist %f)!\n", dist);
 
-        lastTraceUV = Vec2f(uMax + uMin, vMax + vMin) * 0.5;
+        lastTraceUV = Vec2f(uMin + uMax, vMin + vMax) * 0.5;
         lastTracePixelInterval = dist;
         return lastTraceStatus = ImmaturePointStatus::IPS_SKIPPED;
       }
@@ -417,21 +747,21 @@ namespace dso {
 
       // project to arbitrary depth to get direction.
       ptpMax = pr + hostToFrame_Kt * 0.01;
-      uMax = ptpMax[0] / ptpMax[2];
-      vMax = ptpMax[1] / ptpMax[2];
+      uMin = ptpMax[0] / ptpMax[2];
+      vMin = ptpMax[1] / ptpMax[2];
 
       // direction.
-      float dx = uMax - uMin;
-      float dy = vMax - vMin;
+      float dx = uMin - uMax;
+      float dy = vMin - vMax;
       float d = 1.0f / sqrtf(dx * dx + dy * dy);
 
       // set to [setting_maxPixSearch].
-      uMax = uMin + dist * dx * d;
-      vMax = vMin + dist * dy * d;
+      uMin = uMax + dist * dx * d;
+      vMin = vMax + dist * dy * d;
 
       // may still be out!
-      if (!(uMax > 4 && vMax > 4 && uMax < wG[0] - 5 && vMax < hG[0] - 5)) {
-        if (debugPrint) printf("OOB uMax-coarse %f %f %f!\n", uMax, vMax, ptpMax[2]);
+      if (!(uMin > 4 && vMin > 4 && uMin < wG[0] - 5 && vMin < hG[0] - 5)) {
+        if (debugPrint) printf("OOB uMin-coarse %f %f %f!\n", uMin, vMin, ptpMax[2]);
         lastTraceUV = Vec2f(-1, -1);
         lastTracePixelInterval = 0;
         return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
@@ -442,7 +772,7 @@ namespace dso {
 
     // set OOB if scale change too big.
     if (!(idepth_min < 0 || (ptpMin[2] > 0.75 && ptpMin[2] < 1.5))) {
-      if (debugPrint) printf("OOB SCALE %f %f %f!\n", uMax, vMax, ptpMin[2]);
+      if (debugPrint) printf("OOB SCALE %f %f %f!\n", uMin, vMin, ptpMin[2]);
       lastTraceUV = Vec2f(-1, -1);
       lastTracePixelInterval = 0;
       return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
@@ -450,8 +780,8 @@ namespace dso {
 
 
     // ============== compute error-bounds on result in pixel. if the new interval is not at least 1/2 of the old, SKIP ===================
-    float dx = setting_trace_stepsize * (uMax - uMin);
-    float dy = setting_trace_stepsize * (vMax - vMin);
+    float dx = setting_trace_stepsize * (uMin - uMax);
+    float dy = setting_trace_stepsize * (vMin - vMax);
 
     float a = (Vec2f(dx, dy).transpose() * gradH * Vec2f(dx, dy));
     float b = (Vec2f(dy, -dx).transpose() * gradH * Vec2f(dy, -dx));
@@ -460,7 +790,7 @@ namespace dso {
     if (errorInPixel * setting_trace_minImprovementFactor > dist && std::isfinite(idepth_max)) {
       if (debugPrint)
         printf("NO SIGNIFICANT IMPROVMENT (%f)!\n", errorInPixel);
-      lastTraceUV = Vec2f(uMax + uMin, vMax + vMin) * 0.5;
+      lastTraceUV = Vec2f(uMin + uMax, vMin + vMax) * 0.5;
       lastTracePixelInterval = dist;
       return lastTraceStatus = ImmaturePointStatus::IPS_BADCONDITION;
     }
@@ -477,24 +807,24 @@ namespace dso {
       printf("trace pt (%.1f %.1f) from frame %d to %d. Range %f (%.1f %.1f) -> %f (%.1f %.1f)! ErrorInPixel %.1f!\n",
              u, v,
              host->shell->id, frame->shell->id,
-             idepth_min, uMin, vMin,
-             idepth_max, uMax, vMax,
+             idepth_min, uMax, vMax,
+             idepth_max, uMin, vMin,
              errorInPixel
       );
 
 
     if (dist > maxPixSearch) {
-      uMax = uMin + maxPixSearch * dx;
-      vMax = vMin + maxPixSearch * dy;
+      uMin = uMax + maxPixSearch * dx;
+      vMin = vMax + maxPixSearch * dy;
       dist = maxPixSearch;
     }
 
     int numSteps = 1.9999f + dist / setting_trace_stepsize;
     Mat22f Rplane = hostToFrame_KRKi.topLeftCorner<2, 2>();
 
-    float randShift = uMin * 1000 - floorf(uMin * 1000);
-    float ptx = uMin - randShift * dx;
-    float pty = vMin - randShift * dy;
+    float randShift = uMax * 1000 - floorf(uMax * 1000);
+    float ptx = uMax - randShift * dx;
+    float pty = vMax - randShift * dy;
 
 
     Vec2f rotatePattern[MAX_RES_PER_POINT];

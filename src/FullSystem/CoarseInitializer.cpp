@@ -855,15 +855,15 @@ namespace dso {
               pl[nl].u = x;
               pl[nl].v = y;
 
-              pl[nl].idepth = pt->idepthStereo;
-              pl[nl].iR = pt->idepthStereo;
+              pl[nl].idepth = pt->idepth_stereo;
+              pl[nl].iR = pt->idepth_stereo;
 
               pl[nl].isGood = true;
               pl[nl].energy.setZero();
               pl[nl].lastHessian = 0;
               pl[nl].lastHessian_new = 0;
               pl[nl].my_type = (lvl != 0) ? 1 : statusMap[x + y * wl];
-//              idepth[0][x + wl * y] = pt->idepthStereo;
+//              idepth[0][x + wl * y] = pt->idepth_stereo;
 
               pl[nl].outlierTH = patternNum * setting_outlierTH;
               nl++;

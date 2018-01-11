@@ -55,6 +55,7 @@
 #include "util/ImageAndExposure.h"
 
 #include <cmath>
+#include <cv.h>
 
 namespace dso {
   int FrameHessian::instanceCounter = 0;
@@ -1165,8 +1166,128 @@ namespace dso {
 
   }
 
+  void FullSystem::stereoMatch(ImageAndExposure *image, ImageAndExposure *image_right, int id, cv::Mat &idepthMap) {
+    // =========================== add into allFrameHistory =========================
+    FrameHessian *fh = new FrameHessian();
+    FrameHessian *fh_right = new FrameHessian();
+    FrameShell *shell = new FrameShell();
+    shell->camToWorld = SE3();    // no lock required, as fh is not used anywhere yet.
+    shell->aff_g2l = AffLight(0, 0);
+    shell->marginalizedAt = shell->id = allFrameHistory.size();
+    shell->timestamp = image->timestamp;
+    shell->incoming_id = id; // id passed into DSO
+    fh->shell = shell;
+    fh_right->shell = shell;
+
+    // =========================== make Images / derivatives etc. =========================
+    fh->ab_exposure = image->exposure_time;
+    fh->makeImages(image->image, &Hcalib);
+    fh_right->ab_exposure = image_right->exposure_time;
+    fh_right->makeImages(image_right->image, &Hcalib);
+
+    Mat33f K = Mat33f::Identity();
+    K(0, 0) = Hcalib.fxl();
+    K(1, 1) = Hcalib.fyl();
+    K(0, 2) = Hcalib.cxl();
+    K(1, 2) = Hcalib.cyl();
+
+
+    int counter = 0;
+
+    makeNewTraces(fh, 0);
+
+    unsigned char *idepthMapPtr = idepthMap.data;
+
+    std::vector<cv::KeyPoint> keypoints_left;
+    std::vector<cv::KeyPoint> keypoints_right;
+    std::vector<cv::DMatch> matches;
+
+    for (ImmaturePoint *ph : fh->immaturePoints) {
+      ph->u_stereo = ph->u;
+      ph->v_stereo = ph->v;
+      ph->idepth_min_stereo = ph->idepth_min = 0;
+      ph->idepth_max_stereo = ph->idepth_max = NAN;
+
+      ImmaturePointStatus phTraceRightStatus = ph->traceStereo(fh_right, K, 1);
+
+      if (phTraceRightStatus == ImmaturePointStatus::IPS_GOOD) {
+        ImmaturePoint *phRight = new ImmaturePoint(ph->lastTraceUV(0), ph->lastTraceUV(1),  fh_right, ph->my_type, &Hcalib);
+
+        phRight->u_stereo = phRight->u;
+        phRight->v_stereo = phRight->v;
+        phRight->idepth_min_stereo = ph->idepth_min = 0;
+        phRight->idepth_max_stereo = ph->idepth_max = NAN;
+        ImmaturePointStatus phTraceLeftStatus = phRight->traceStereo(fh, K, 0);
+
+        float u_stereo_delta = abs(ph->u_stereo - phRight->lastTraceUV(0));
+        float depth = 1.0f / ph->idepth_stereo;
+
+        if (phTraceLeftStatus == ImmaturePointStatus::IPS_GOOD && u_stereo_delta < 1 && depth > 0 &&
+            depth < 70)    //original u_stereo_delta 1 depth < 70
+        {
+//          if (ph->u - ph->lastTraceUV(0) > 0) {
+          keypoints_left.emplace_back(ph->u, ph->v, 1);
+          keypoints_right.emplace_back(ph->lastTraceUV(0), ph->lastTraceUV(1), 1);
+          matches.emplace_back(keypoints_left.size() - 1, keypoints_right.size() - 1, 1.0f);
+//          }
+
+          ph->idepth_min = ph->idepth_min_stereo;
+          ph->idepth_max = ph->idepth_max_stereo;
+
+          *((float *) (idepthMapPtr + int(ph->v) * idepthMap.step) + (int) ph->u * 3) = ph->idepth_stereo;
+          *((float *) (idepthMapPtr + int(ph->v) * idepthMap.step) + (int) ph->u * 3 + 1) = ph->idepth_min;
+          *((float *) (idepthMapPtr + int(ph->v) * idepthMap.step) + (int) ph->u * 3 + 2) = ph->idepth_max;
+
+          counter++;
+        }
+      }
+    }
+
+//    std::sort(error.begin(), error.end());
+//    std::cout << 0.25 <<" "<<error[error.size()*0.25].first<<" "<<
+//              0.5 <<" "<<error[error.size()*0.5].first<<" "<<
+//              0.75 <<" "<<error[error.size()*0.75].first<<" "<<
+//              0.1 <<" "<<error.back().first << std::endl;
+
+//    for(int i = 0; i < error.size(); i++)
+//        std::cout << error[i].first << " " << error[i].second.first << " " << error[i].second.second << std::endl;
+
+    std::cout << " frameID " << id << " got good matches " << counter << std::endl;
+
+    cv::Mat matLeft(image->h, image->w, CV_32F, image->image);
+    cv::Mat matRight(image_right->h, image_right->w, CV_32F, image_right->image);
+    matLeft.convertTo(matLeft, CV_8UC3);
+    matRight.convertTo(matRight, CV_8UC3);
+
+    cv::Mat matMatches;
+    cv::drawMatches(matLeft, keypoints_left, matRight, keypoints_right, matches, matMatches);
+    cv::imshow("matches", matMatches);
+    cv::waitKey(0);
+
+    delete fh;
+    delete fh_right;
+
+    return;
+  }
 
   void FullSystem::addActiveFrame(ImageAndExposure *image, ImageAndExposure *imageRight, int id) {
+
+
+//    cv::Mat matLeft(image->h, image->w, CV_32F, image->image);
+//    cv::Mat matRight(imageRight->h, imageRight->w, CV_32F, imageRight->image);
+//
+//
+//    matLeft.convertTo(matLeft, CV_8UC3);
+//    matRight.convertTo(matRight, CV_8UC3);
+//
+//    cv::Mat matShow(image->h, image->w * 2, CV_8UC3);
+//
+//    matShow.rowRange(0, image->h).colRange(0, image->w) = matLeft;
+//    matShow.rowRange(0, image->h).colRange(image->w, image->w * 2) = matRight;
+//
+//
+//    cv::imshow("LR", matShow);
+//    cv::waitKey(0);
 
     if (isLost) return;
     boost::unique_lock<boost::mutex> lock(trackMutex);
@@ -1586,7 +1707,7 @@ namespace dso {
 
       pt->idepth_min = pt->idepth_min_stereo;
       pt->idepth_max = pt->idepth_max_stereo;
-      idepthStereo = pt->idepthStereo;
+      idepthStereo = pt->idepth_stereo;
 
 
       if (!std::isfinite(pt->energyTH) || !std::isfinite(pt->idepth_min) || !std::isfinite(pt->idepth_max)
