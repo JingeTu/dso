@@ -68,6 +68,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 
 	bool print = false;//rand()%50==0;
 
+	// lastHdd, lastbd 是要优化 idepth
 	float lastEnergy = 0;
 	float lastHdd=0;
 	float lastbd=0;

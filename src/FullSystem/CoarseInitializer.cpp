@@ -849,6 +849,7 @@ namespace dso {
             pt->v_stereo = pt->v;
             pt->idepth_min_stereo = 0; //- min idepth corresponds to the max depth
             pt->idepth_max_stereo = NAN; //- max idepth corresponds to the min depth
+
             ImmaturePointStatus stat = pt->traceStereo(firstFrameRight, K, 1);
 
             if (stat == ImmaturePointStatus::IPS_GOOD) {
@@ -872,8 +873,10 @@ namespace dso {
 
               pl[nl].u = x;
               pl[nl].v = y;
-              pl[nl].idepth = 0.01;
+
+              pl[nl].idepth = 0.01; // a large depth
               pl[nl].iR = 0.01;
+
               pl[nl].isGood = true;
               pl[nl].energy.setZero();
               pl[nl].lastHessian = 0;
@@ -898,14 +901,16 @@ namespace dso {
             //assert(patternNum==9);
             pl[nl].u = x + 0.1;
             pl[nl].v = y + 0.1;
-            pl[nl].idepth = 1;
+
+            pl[nl].idepth = 1; // 如果不是第一层的，就设置 depth 为 1，人也不愿意为右片做金字塔影像。
             pl[nl].iR = 1;
+
             pl[nl].isGood = true;
             pl[nl].energy.setZero();
             pl[nl].lastHessian = 0;
             pl[nl].lastHessian_new = 0;
             pl[nl].my_type = (lvl != 0) ? 1 : statusMap[x + y * wl];
-            int bidx = 2 * x + 2 * y * wlm1;
+//            int bidx = 2 * x + 2 * y * wlm1;
 //            idepth_l[x + y * wl] = idepth_lm[bidx] +
 //                                   idepth_lm[bidx + 1] +
 //                                   idepth_lm[bidx + wlm1] +

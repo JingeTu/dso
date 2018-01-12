@@ -274,6 +274,9 @@ namespace dso {
 
     std::vector<SE3, Eigen::aligned_allocator<SE3>> lastF_2_fh_tries;
     if (allFrameHistory.size() == 2) {
+
+      initializeFromInitializer(fh);
+
       lastF_2_fh_tries.push_back(SE3(Eigen::Matrix<double, 3, 3>::Identity(), Eigen::Matrix<double, 3, 1>::Zero()));
 
       for (float rotDelta = 0.02; rotDelta < 0.05; rotDelta = rotDelta + 0.02) {
@@ -390,7 +393,7 @@ namespace dso {
                                    SE3(Sophus::Quaterniond(1, rotDelta, 0, rotDelta),
                                        Vec3(0, 0, 0)));  // assume constant motion.
         lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast *
-                                   SE3(Sophus::Quaterniond(1, -rotDelta, rotDelta, 0),
+                                  setting_kfGlobalWeight SE3(Sophus::Quaterniond(1, -rotDelta, rotDelta, 0),
                                        Vec3(0, 0, 0)));  // assume constant motion.
         lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast *
                                    SE3(Sophus::Quaterniond(1, 0, -rotDelta, rotDelta),
@@ -819,9 +822,12 @@ namespace dso {
 
       for (ImmaturePoint *ph : host->immaturePoints) {
         //- Do temporal stereo match
+        // host 中的 immaturePoints 先与 fh（左片匹配） 更新一波 idepth_min 和 idepth_max
         ImmaturePointStatus phTrackStatus = ph->traceOn(fh, KRKi, Kt, aff, &Hcalib, false);
 
         if (phTrackStatus == ImmaturePointStatus::IPS_GOOD) {
+          // 与左片匹配上了，可以得到这个点在左片上的坐标 ph->lastTraceUV(0), ph->lastTraceUV(1)
+          // 现在将这个点匹配两次，左片到右片，右片到左片，确定这个点在左片上的深度，最后用这个深度去更新在 host 上的深度
           ImmaturePoint *phNonKey = new ImmaturePoint(ph->lastTraceUV(0), ph->lastTraceUV(1), fh, ph->my_type, &Hcalib);
 
           Vec3f ptpMin = KRKi * (Vec3f(ph->u, ph->v, 1) / ph->idepth_min) + Kt;
@@ -838,6 +844,7 @@ namespace dso {
 
           //- Do static stereo match from left to right
           ImmaturePointStatus phNonKeyStereoStatus = phNonKey->traceStereo(fhRight, K, true);
+
           if (phNonKeyStereoStatus == ImmaturePointStatus::IPS_GOOD) {
             ImmaturePoint* phNonKeyRight = new ImmaturePoint(phNonKey->lastTraceUV(0), phNonKey->lastTraceUV(1), fhRight, ph->my_type, &Hcalib);
 
@@ -903,6 +910,7 @@ namespace dso {
                                               fh->aff_g2l()).cast<float>();
 
       for (ImmaturePoint *ph : host->immaturePoints) {
+        // 使用 fh 优化 host 中所有 immaturePoints 点的深度
         ph->traceOn(fh, KRKi, Kt, aff, &Hcalib, false);
 
         if (ph->lastTraceStatus == ImmaturePointStatus::IPS_GOOD) trace_good++;
@@ -956,10 +964,12 @@ namespace dso {
       printf("SPARSITY:  MinActDist %f (need %d points, have %d points)!\n",
              currentMinActDist, (int) (setting_desiredPointDensity), ef->nPoints);
 
-
+    // 当前帧
     FrameHessian *newestHs = frameHessians.back();
 
     // make dist map.
+    // 这个东西实在是看不懂，又是 BFS 的，搞什么嘛。
+    // 反正这东西就是用 frameHessians 中的帧确定当前帧 newestHs 的深度图（1/2,1/2）level 1 的级别。
     coarseDistanceMap->makeK(&Hcalib);
     coarseDistanceMap->makeDistanceMap(frameHessians, newestHs);
 
@@ -968,7 +978,8 @@ namespace dso {
     std::vector<ImmaturePoint *> toOptimize;
     toOptimize.reserve(20000);
 
-
+    // 将 frameHessians 中所有帧的所有 immaturePoints 投影到当前帧的 level 1 影像上，确定深度在当前帧的深度。
+    // 如果深度满足 dist >= currentMinActDist * ph->my_type，就加入到 toOptimize 中去。
     for (FrameHessian *host : frameHessians)    // go through all active frames
     {
       if (host == newestHs) continue;
@@ -1037,6 +1048,7 @@ namespace dso {
     std::vector<PointHessian *> optimized;
     optimized.resize(toOptimize.size());
 
+    // 将当前帧 newestHs 的 pointHessians 的逆深度优化
     if (multiThreading)
       treadReduce.reduce(
           boost::bind(&FullSystem::activatePointsMT_Reductor, this, &optimized, &toOptimize, _1, _2, _3, _4), 0,
@@ -1045,7 +1057,7 @@ namespace dso {
     else
       activatePointsMT_Reductor(&optimized, &toOptimize, 0, toOptimize.size(), 0, 0);
 
-
+    // 正式地将 immaturePoint 转化为 pointHessians
     for (unsigned k = 0; k < toOptimize.size(); k++) {
       PointHessian *newpoint = optimized[k];
       ImmaturePoint *ph = toOptimize[k];
@@ -1166,10 +1178,10 @@ namespace dso {
 
   }
 
-  void FullSystem::stereoMatch(ImageAndExposure *image, ImageAndExposure *image_right, int id, cv::Mat &idepthMap) {
+  void FullSystem::stereoMatch(ImageAndExposure *image, ImageAndExposure *imageRight, int id, cv::Mat &idepthMap) {
     // =========================== add into allFrameHistory =========================
     FrameHessian *fh = new FrameHessian();
-    FrameHessian *fh_right = new FrameHessian();
+    FrameHessian *fhRight = new FrameHessian();
     FrameShell *shell = new FrameShell();
     shell->camToWorld = SE3();    // no lock required, as fh is not used anywhere yet.
     shell->aff_g2l = AffLight(0, 0);
@@ -1177,13 +1189,13 @@ namespace dso {
     shell->timestamp = image->timestamp;
     shell->incoming_id = id; // id passed into DSO
     fh->shell = shell;
-    fh_right->shell = shell;
+    fhRight->shell = shell;
 
     // =========================== make Images / derivatives etc. =========================
     fh->ab_exposure = image->exposure_time;
     fh->makeImages(image->image, &Hcalib);
-    fh_right->ab_exposure = image_right->exposure_time;
-    fh_right->makeImages(image_right->image, &Hcalib);
+    fhRight->ab_exposure = imageRight->exposure_time;
+    fhRight->makeImages(imageRight->image, &Hcalib);
 
     Mat33f K = Mat33f::Identity();
     K(0, 0) = Hcalib.fxl();
@@ -1210,10 +1222,10 @@ namespace dso {
 
 
 //      std::cout << "idx: " << ph->idxInImmaturePoints << "\t Right." << std::endl;
-      ImmaturePointStatus phTraceRightStatus = ph->traceStereo(fh_right, K, 1);
+      ImmaturePointStatus phTraceRightStatus = ph->traceStereo(fhRight, K, 1);
 
       if (phTraceRightStatus == ImmaturePointStatus::IPS_GOOD) {
-        ImmaturePoint *phRight = new ImmaturePoint(ph->lastTraceUV(0), ph->lastTraceUV(1),  fh_right, ph->my_type, &Hcalib);
+        ImmaturePoint *phRight = new ImmaturePoint(ph->lastTraceUV(0), ph->lastTraceUV(1),  fhRight, ph->my_type, &Hcalib);
 
         phRight->u_stereo = phRight->u;
         phRight->v_stereo = phRight->v;
@@ -1258,7 +1270,7 @@ namespace dso {
     std::cout << " frameID " << id << " got good matches " << counter << std::endl;
 
     cv::Mat matLeft(image->h, image->w, CV_32F, image->image);
-    cv::Mat matRight(image_right->h, image_right->w, CV_32F, image_right->image);
+    cv::Mat matRight(imageRight->h, imageRight->w, CV_32F, imageRight->image);
     matLeft.convertTo(matLeft, CV_8UC3);
     matRight.convertTo(matRight, CV_8UC3);
 
@@ -1268,7 +1280,7 @@ namespace dso {
     cv::waitKey(0);
 
     delete fh;
-    delete fh_right;
+    delete fhRight;
 
     return;
   }
@@ -1350,9 +1362,7 @@ namespace dso {
         coarseTracker_forNewKF = tmp;
       }
 
-      if (allFrameHistory.size() == 2) initializeFromInitializer(fh);
-
-
+      // 确定 fh 与 coarseTracker->lastRef 的相对位置姿态。
       Vec4 tres = trackNewCoarseStereo(fh, fhRight);
       if (!std::isfinite((double) tres[0]) || !std::isfinite((double) tres[1]) || !std::isfinite((double) tres[2]) ||
           !std::isfinite((double) tres[3])) {
@@ -1507,6 +1517,8 @@ namespace dso {
       fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l);
     }
 
+    // 使用当前帧更新 frameHessians 中所有帧的所有 immaturePoints 的 idepth_max 和 idepth_min
+    // 比 traceNewCoarseKey 多一步左右片匹配的过程
     traceNewCoarseNonKey(fh, fhRight);
     delete fh;
     delete fhRight;
@@ -1521,6 +1533,7 @@ namespace dso {
       fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l);
     }
 
+    // 使用当前帧更新 frameHessians 中所有帧的所有 immaturePoints 的 idepth_max 和 idepth_min
     traceNewCoarseKey(fh);
 
     boost::unique_lock<boost::mutex> lock(mapMutex);
@@ -1531,9 +1544,11 @@ namespace dso {
 
     // =========================== add New Frame to Hessian Struct. =========================
     fh->idx = frameHessians.size();
+    // 当前帧加入 frameHessians
     frameHessians.push_back(fh);
     fh->frameID = allKeyFramesHistory.size();
     allKeyFramesHistory.push_back(fh->shell);
+    // 优化 添加 帧
     ef->insertFrame(fh, &Hcalib);
 
     setPrecalcValues();
@@ -1541,7 +1556,7 @@ namespace dso {
 
 
     // =========================== add new residuals for old points =========================
-    int numFwdResAdde = 0;
+    int numFwdResAdded = 0;
     for (FrameHessian *fh1 : frameHessians)    // go through all active frames
     {
       if (fh1 == fh) continue;
@@ -1549,10 +1564,11 @@ namespace dso {
         PointFrameResidual *r = new PointFrameResidual(ph, fh1, fh);
         r->setState(ResState::IN);
         ph->residuals.push_back(r);
+        // 优化 添加 点与帧的联系
         ef->insertResidual(r);
         ph->lastResiduals[1] = ph->lastResiduals[0];
         ph->lastResiduals[0] = std::pair<PointFrameResidual *, ResState>(r, ResState::IN);
-        numFwdResAdde += 1;
+        numFwdResAdded += 1;
       }
     }
 
@@ -1560,7 +1576,9 @@ namespace dso {
 
 
     // =========================== Activate Points (& flag for marginalization). =========================
+    // 使用 frameHessians 中所有帧优化当前帧 immaturePoints 的逆深度，并且将这些点转换成 pointsHessians
     activatePointsMT();
+    // 优化 设置 三维点节点与帧的约束边
     ef->makeIDX();
 
 
@@ -1653,6 +1671,7 @@ namespace dso {
   }
 
 
+  // 调用这个函数的时候newFrame相对于firstFrame的相对位置姿态未知。
   void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
     boost::unique_lock<boost::mutex> lock(mapMutex);
 
@@ -1694,34 +1713,34 @@ namespace dso {
       printf("Initialization: keep %.1f%% (need %d, have %d)!\n", 100 * keepPercentage,
              (int) (setting_desiredPointDensity), coarseInitializer->numPoints[0]);
 
-    // initialize first frame by idepth computed by static stereo matching
+    // initialize *first frame* by idepth computed by static stereo matching
     for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
       if (rand() / (float) RAND_MAX > keepPercentage) continue;
 
       Pnt *point = coarseInitializer->points[0] + i;
-      ImmaturePoint *pt = new ImmaturePoint(point->u + 0.5f, point->v + 0.5f, firstFrame, point->my_type, &Hcalib);
+      ImmaturePoint *ip = new ImmaturePoint(point->u + 0.5f, point->v + 0.5f, firstFrame, point->my_type, &Hcalib);
 
-      pt->u_stereo = pt->u;
-      pt->v_stereo = pt->v;
-      pt->idepth_min_stereo = 0;
-      pt->idepth_max_stereo = NAN;
+      ip->u_stereo = ip->u;
+      ip->v_stereo = ip->v;
+      ip->idepth_min_stereo = 0;
+      ip->idepth_max_stereo = NAN;
 
-      pt->traceStereo(firstFrameRight, K, 1);
+      ip->traceStereo(firstFrameRight, K, 1);
 
-      pt->idepth_min = pt->idepth_min_stereo;
-      pt->idepth_max = pt->idepth_max_stereo;
-      idepthStereo = pt->idepth_stereo;
+      ip->idepth_min = ip->idepth_min_stereo;
+      ip->idepth_max = ip->idepth_max_stereo;
+      idepthStereo = ip->idepth_stereo;
 
 
-      if (!std::isfinite(pt->energyTH) || !std::isfinite(pt->idepth_min) || !std::isfinite(pt->idepth_max)
-          || pt->idepth_min < 0 || pt->idepth_max < 0) {
-        delete pt;
+      if (!std::isfinite(ip->energyTH) || !std::isfinite(ip->idepth_min) || !std::isfinite(ip->idepth_max)
+          || ip->idepth_min < 0 || ip->idepth_max < 0) {
+        delete ip;
         continue;
 
       }
 
-      PointHessian *ph = new PointHessian(pt, &Hcalib);
-      delete pt;
+      PointHessian *ph = new PointHessian(ip, &Hcalib);
+      delete ip;
       if (!std::isfinite(ph->energyTH)) {
         delete ph;
         continue;
@@ -1748,11 +1767,11 @@ namespace dso {
       firstFrame->shell->trackingRef = 0;
       firstFrame->shell->camToTrackingRef = SE3();
 
-      newFrame->shell->camToWorld = firstToNew.inverse();
-      newFrame->shell->aff_g2l = AffLight(0, 0);
-      newFrame->setEvalPT_scaled(newFrame->shell->camToWorld.inverse(), newFrame->shell->aff_g2l);
-      newFrame->shell->trackingRef = firstFrame->shell;
-      newFrame->shell->camToTrackingRef = firstToNew.inverse();
+//      newFrame->shell->camToWorld = firstToNew.inverse();
+//      newFrame->shell->aff_g2l = AffLight(0, 0);
+//      newFrame->setEvalPT_scaled(newFrame->shell->camToWorld.inverse(), newFrame->shell->aff_g2l);
+//      newFrame->shell->trackingRef = firstFrame->shell;
+//      newFrame->shell->camToTrackingRef = firstToNew.inverse();
 
     }
 
