@@ -59,6 +59,8 @@ namespace dso {
     float color[MAX_RES_PER_POINT];
     float weights[MAX_RES_PER_POINT];
 
+    Vec15f patternNCCHostNormalized; // for NCC use
+
 
     Mat22f gradH;
     Vec2f gradH_ev;

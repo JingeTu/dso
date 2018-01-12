@@ -1208,6 +1208,8 @@ namespace dso {
       ph->idepth_min_stereo = ph->idepth_min = 0;
       ph->idepth_max_stereo = ph->idepth_max = NAN;
 
+
+//      std::cout << "idx: " << ph->idxInImmaturePoints << "\t Right." << std::endl;
       ImmaturePointStatus phTraceRightStatus = ph->traceStereo(fh_right, K, 1);
 
       if (phTraceRightStatus == ImmaturePointStatus::IPS_GOOD) {
@@ -1217,6 +1219,7 @@ namespace dso {
         phRight->v_stereo = phRight->v;
         phRight->idepth_min_stereo = ph->idepth_min = 0;
         phRight->idepth_max_stereo = ph->idepth_max = NAN;
+//        std::cout << "idx: " << ph->idxInImmaturePoints << "\t Left." << std::endl;
         ImmaturePointStatus phTraceLeftStatus = phRight->traceStereo(fh, K, 0);
 
         float u_stereo_delta = abs(ph->u_stereo - phRight->lastTraceUV(0));

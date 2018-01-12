@@ -55,6 +55,18 @@ namespace dso {
           setting_outlierTHSumComponent / (setting_outlierTHSumComponent + ptc.tail<2>().squaredNorm()));
     }
 
+    //- Get patternNCCHostNormalized from host
+    for (int idx = 0; idx < patternNumNCC; idx++) {
+      int dx = patternPNCC[idx][0];
+      int dy = patternPNCC[idx][1];
+
+      Vec3f ptc = getInterpolatedElement33BiLin(host->dI, u + dx, v + dy, wG[0]);
+
+
+      patternNCCHostNormalized[idx] = ptc[0];
+    }
+    patternNCCHostNormalized.normalize();
+
     energyTH = patternNum * setting_outlierTH;
     energyTH *= setting_overallEnergyTHWeight * setting_overallEnergyTHWeight;
 
@@ -65,7 +77,7 @@ namespace dso {
   ImmaturePoint::~ImmaturePoint() {
   }
 
-  /*
+
   // modeRight == true, from left to right, modeRight == false, from right to left
   ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frameRight, Mat33f K, bool modeRight) {
     // KRKi
@@ -197,7 +209,7 @@ namespace dso {
 
     Vec2f rotatePattern[patternNumNCC];
     for (int idx = 0; idx < patternNumNCC; idx++)
-      rotatePattern[idx] = Rplane * Vec2f(patternNCC[idx][0], patternNCC[idx][1]);
+      rotatePattern[idx] = Rplane * Vec2f(patternPNCC[idx][0], patternPNCC[idx][1]);
 
     if (!std::isfinite(dx) || !std::isfinite(dy)) {
       lastTraceUV = Vec2f(-1, -1);
@@ -210,14 +222,6 @@ namespace dso {
     int bestIdx = -1;
     if (numSteps >= 100) numSteps = 99;
 
-    //- Get patternHost from host
-    using Vec15f = Eigen::Matrix<float, 15, 1>;
-    Vec15f patternHost;
-    for (int idx = 0; idx < patternNumNCC; idx++)
-      patternHost[idx] = host->dI[(int) (u_stereo + v_stereo * wG[0] + 0.5)][0];
-
-    patternHost.normalize();
-
     //- Do step searches for the GN optimization initial state.
     for (int i = 0; i < numSteps; i++) {
       float energy = 0;
@@ -229,19 +233,19 @@ namespace dso {
                                                   (float) (ptx + rotatePattern[idx][0]),
                                                   (float) (pty + rotatePattern[idx][1]),
                                                   wG[0]);
-//        patternTarget[idx] = hitColor;
-        if (!std::isfinite(hitColor)) {
-          energy += 1e5;
-          continue;
-        }
-        float residual = hitColor - (float) (aff[0] * color[idx] + aff[1]);
-        float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual); // settings_huberTH == 9
-        energy += hw * residual * residual * (2 - hw);
+        patternTarget[idx] = hitColor;
+//        if (!std::isfinite(hitColor)) {
+//          energy += 1e5;
+//          continue;
+//        }
+//        float residual = hitColor - (float) (aff[0] * color[idx] + aff[1]);
+//        float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual); // settings_huberTH == 9
+//        energy += hw * residual * residual * (2 - hw);
       }
 
-//      patternTarget.normalize();
+      patternTarget.normalize();
 
-      energy = 1.0f - patternHost.dot(patternTarget.transpose());
+      energy = 1.0f - patternNCCHostNormalized.dot(patternTarget.transpose());
 
       errors[i] = energy;
       if (energy < bestEnergy) {
@@ -265,6 +269,7 @@ namespace dso {
     float newQuality = secondBest / bestEnergy;
     if (newQuality < quality || numSteps > 10) quality = newQuality;
 
+//    std::cout << "bestEnergy: " << bestEnergy << "bestU: " << bestU << std::endl;
 
     // ============== do GN optimization ===================
     float uBak = bestU, vBak = bestV, gnstepsize = 1, stepBack = 0;
@@ -280,32 +285,35 @@ namespace dso {
                                                   (float) (bestU + rotatePattern[idx][0]),
                                                   (float) (bestV + rotatePattern[idx][1]), wG[0]);
 
-        if (!std::isfinite((float) hitColor[0])) {
-          energy += 1e5;
-          continue;
-        }
-        float residual = hitColor[0] - (aff[0] * color[idx] + aff[1]);
-        float dResdDist = dx * hitColor[1] + dy * hitColor[2];
-        float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+//        if (!std::isfinite((float) hitColor[0])) {
+//          energy += 1e5;
+//          continue;
+//        }
+//        float residual = hitColor[0] - (aff[0] * color[idx] + aff[1]);
+//        float dResdDist = dx * hitColor[1] + dy * hitColor[2];
+//        float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+//
+//        H += hw * dResdDist * dResdDist;
+//        b += hw * residual * dResdDist;
+//        energy += weights[idx] * weights[idx] * hw * residual * residual * (2 - hw);
 
-        H += hw * dResdDist * dResdDist;
-        b += hw * residual * dResdDist;
-        energy += weights[idx] * weights[idx] * hw * residual * residual * (2 - hw);
-
-//        patternTarget[idx] = hitColor[0];
-//        gxTarget[idx] = hitColor[1];
-//        gyTarget[idx] = hitColor[2];
+        patternTarget[idx] = hitColor[0];
+        gxTarget[idx] = hitColor[1];
+        gyTarget[idx] = hitColor[2];
       }
 
-//      float normTarget = patternTarget.norm();
-//
-//      for (int idx = 0; idx < patternNumNCC; idx++) {
-//        J += -(1.0f / normTarget - (patternTarget[idx] * patternTarget[idx]) / (normTarget * normTarget * normTarget))
-//            * (gxTarget[idx] * dx + gyTarget[idx] * dy);
-//      }
-//
-//      H = J * J;
-//      b = J * (patternTarget.dot(patternHost) / normTarget);
+      float normTarget = patternTarget.norm();
+
+      energy = 1.0 - patternNCCHostNormalized.dot(patternTarget.transpose()) / normTarget;
+
+      for (int idx = 0; idx < patternNumNCC; idx++) {
+        J += -(gxTarget[idx] * dx + gyTarget[idx] * dy)
+            * (1 / normTarget - patternTarget[idx] / (normTarget * normTarget * normTarget))
+            * patternNCCHostNormalized[idx];
+      }
+
+      H = J * J;
+      b = J * energy;
 
       if (energy > bestEnergy) {
         gnStepsBad++;
@@ -334,8 +342,10 @@ namespace dso {
       if (fabsf(stepBack) < setting_trace_GNThreshold) break;
     }
 
-    if (!(bestEnergy < energyTH * setting_trace_extraSlackOnTH)) { //- This energyTH is constant for all the points.
+//    std::cout << "after bestEnergy: " << bestEnergy << "\tbestU: " << bestU << std::endl;
 
+//    if (!(bestEnergy < energyTH * setting_trace_extraSlackOnTH)) { //- This energyTH is constant for all the points.
+    if (!(bestEnergy < 0.3)) {
       lastTracePixelInterval = 0;
       lastTraceUV = Vec2f(-1, -1);
       if (lastTraceStatus == ImmaturePointStatus::IPS_OUTLIER)
@@ -367,10 +377,10 @@ namespace dso {
     idepth_stereo = (u_stereo - bestU) / bf;
     return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
   }
-*/
 
+/*
   // modeRight == true, from left to right, modeRight == false, from right to left
-  ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frameRight, Mat33f K, bool modeRight) {
+  ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frame, Mat33f K, bool modeRight) {
 
     // KRKi
     Mat33f KRKi = Mat33f::Identity().cast<float>();
@@ -532,7 +542,7 @@ namespace dso {
       for(int idx=0;idx<patternNum;idx++)
       {
 
-        float hitColor = getInterpolatedElement31(frameRight->dI,
+        float hitColor = getInterpolatedElement31(frame->dI,
                                                   (float)(ptx+rotatetPattern[idx][0]),
                                                   (float)(pty+rotatetPattern[idx][1]),
                                                   wG[0]);
@@ -577,7 +587,7 @@ namespace dso {
       float H = 1, b=0, energy=0;
       for(int idx=0;idx<patternNum;idx++)
       {
-        Vec3f hitColor = getInterpolatedElement33(frameRight->dI,
+        Vec3f hitColor = getInterpolatedElement33(frame->dI,
                                                   (float)(bestU+rotatetPattern[idx][0]),
                                                   (float)(bestV+rotatetPattern[idx][1]),wG[0]);
 
@@ -667,7 +677,7 @@ namespace dso {
     idepth_stereo = (u_stereo - bestU)/bf;
     return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
   }
-
+*/
 /*
  * returns
  * * OOB -> point is optimized and marginalized

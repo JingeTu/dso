@@ -216,9 +216,10 @@ extern int staticPatternPadding[10];
 #define patternNum 8
 #define patternP staticPattern[8]
 #define patternPadding 2
-//#define patternNum 15
-//#define patternP staticNCCPattern35
-//#define patternPadding 2
+  
+#define patternNumNCC 15
+#define patternPNCC staticNCCPattern35
+#define patternPaddingNCC 2
 
 
 }
