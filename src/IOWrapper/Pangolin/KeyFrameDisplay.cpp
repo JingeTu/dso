@@ -78,7 +78,7 @@ void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
 	fyi = 1/fy;
 	cxi = -cx / fx;
 	cyi = -cy / fy;
-	camToWorld = frame->camToWorld;
+	camToWorld = frame->T_WC;
 	needRefresh=true;
 }
 
@@ -160,7 +160,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 	}
 	assert(numSparsePoints <= npoints);
 
-	camToWorld = fh->PRE_camToWorld;
+	camToWorld = fh->PRE_T_WC;
 	needRefresh=true;
 }
 

@@ -28,11 +28,12 @@
 #include <deque>
 #include "util/NumType.h"
 #include "util/globalCalib.h"
-#include "vector"
+#include "util/IMUPropagation.h"
+#include "util/IMUMeasurement.h"
+#include <vector>
  
 #include <iostream>
 #include <fstream>
-#include "util/NumType.h"
 #include "FullSystem/Residuals.h"
 #include "FullSystem/HessianBlocks.h"
 #include "util/FrameShell.h"
@@ -138,7 +139,7 @@ public:
 	virtual ~FullSystem();
 
 	// adds a new frame, and creates point & residual structs.
-	void addActiveFrame(ImageAndExposure* image, ImageAndExposure* imageRight, int id);
+	void addActiveFrame(ImageAndExposure* image, ImageAndExposure* imageRight, std::vector<IMUMeasurement> &imuMeasurements, int id);
 
 	void stereoMatch(ImageAndExposure *image, ImageAndExposure *imageRight, int id, cv::Mat &idepthMap);
 	// marginalizes a frame. drops / marginalizes points & residuals.
@@ -169,7 +170,7 @@ private:
 
 	CalibHessian Hcalib;
 
-
+	IMUParameters imuParameters;
 
 
 	// opt single point
@@ -286,6 +287,7 @@ private:
 	boost::mutex coarseTrackerSwapMutex;			// if tracker sees that there is a new reference, tracker locks [coarseTrackerSwapMutex] and swaps the two.
 	CoarseTracker* coarseTracker_forNewKF;			// set as as reference. protected by [coarseTrackerSwapMutex].
 	CoarseTracker* coarseTracker;					// always used to track new frames. protected by [trackMutex].
+  IMUPropagation* imuPropagation;
 	float minIdJetVisTracker, maxIdJetVisTracker;
 	float minIdJetVisDebug, maxIdJetVisDebug;
 

@@ -98,8 +98,8 @@ namespace dso {
     Pnt *points[PYR_LEVELS];
     int numPoints[PYR_LEVELS];
     AffLight thisToNext_aff;
-    SE3 thisToNext;
-
+    SE3 T_10;
+    SE3 T_WC_ini; // the pose of first cam0 frame.
 
     FrameHessian *firstFrame;
     FrameHessian* firstFrameRight;

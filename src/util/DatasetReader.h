@@ -33,6 +33,7 @@
 #include <algorithm>
 
 #include "util/Undistort.h"
+#include "util/IMUMeasurement.h"
 #include "IOWrapper/ImageRW.h"
 
 #if HAS_ZIPLIB
@@ -96,13 +97,86 @@ struct PrepImageItem
 	}
 };
 
+class IMUFileReader {
+public:
+  IMUFileReader(std::string imuFilePath) {
 
+		std::cout << imuFilePath << std::endl;
+
+    std::ifstream f(imuFilePath);
+    if (!f.is_open()) {
+      printf("Open IMU file failed: %s", imuFilePath.c_str());
+      return;
+    }
+    size_t imuCount = 0;
+
+		IMUMeasurement item;
+    long long timestampL;
+
+		std::string buf;
+
+    while (!f.eof() && f.good()) {
+			std::getline(f, buf);
+      if (7 == sscanf(buf.c_str(), "%lld,%lf,%lf,%lf,%lf,%lf,%lf",
+                      &timestampL, &item.gyr[0], &item.gyr[1], &item.gyr[2],
+                      &item.acc[0], &item.acc[1], &item.acc[2])) {
+				imuCount++;
+			}
+    }
+
+    vec_imu_.reserve(imuCount);
+
+    f.clear();
+    f.seekg(0, std::ios::beg);
+
+
+    while (!f.eof() && f.good()) {
+			std::getline(f, buf);
+      if (7 == sscanf(buf.c_str(), "%lld,%lf,%lf,%lf,%lf,%lf,%lf",
+          &timestampL, &item.gyr[0], &item.gyr[1], &item.gyr[2],
+          &item.acc[0], &item.acc[1], &item.acc[2])) {
+        item.timestamp = timestampL * 1e-9;
+        vec_imu_.push_back(item);
+      }
+    }
+
+    printf("IMUFileReader: got %lld imu measurements in %s!\n", (long long int)vec_imu_.size(), imuFilePath.c_str());
+  }
+
+	void getIMUMeasurementsBetween(double start, double end, std::vector<IMUMeasurement> &retImuMeasurements) {
+
+//    printf("getIMUMeasurementsBetween [%lf, %lf]\n", start, end);
+		std::vector<IMUMeasurement>::iterator startIt = vec_imu_.end();
+		std::vector<IMUMeasurement>::iterator endIt = vec_imu_.end();
+
+		for (auto it = vec_imu_.begin(); it != vec_imu_.end(); ++it) {
+			if ((*it).timestamp > start && startIt == vec_imu_.end()) {
+//        printf("%lf\n", (*it).timestamp);
+				startIt = it;
+			}
+			if ((*it).timestamp > end && endIt == vec_imu_.end()) {
+//        printf("%lf\n", (*it).timestamp);
+				endIt = it;
+				break;
+			}
+		}
+
+//		assert(startIt != vec_imu_.end() && endIt != vec_imu_.end());
+
+		if (startIt != vec_imu_.end() && endIt != vec_imu_.end()) {
+			retImuMeasurements.insert(retImuMeasurements.begin(), startIt, endIt);
+		}
+	}
+
+private:
+  std::vector<IMUMeasurement> vec_imu_;
+};
 
 
 class ImageFolderReader
 {
 public:
-	ImageFolderReader(std::string path, std::string calibFile, std::string gammaFile, std::string vignetteFile)
+	ImageFolderReader(std::string path, std::string timestampFile, std::string calibFile, std::string gammaFile, std::string vignetteFile)
 	{
 		this->path = path;
 		this->calibfile = calibFile;
@@ -120,8 +194,14 @@ public:
 
 
 		// load timestamps if possible.
-		loadTimestamps();
+		// this is for EuRoCDataset
+		if (!timestampFile.empty()) {
+			loadTimestamps(timestampFile);
+		}
+		else
+			loadTimestamps();
 		printf("ImageFolderReader: got %d files in %s!\n", (int)files.size(), path.c_str());
+    assert (timestamps.size() == files.size());
 
 	}
 	~ImageFolderReader()
@@ -156,7 +236,7 @@ public:
 		int w_out, h_out;
 		Eigen::Matrix3f K;
 		getCalibMono(K, w_out, h_out);
-		setGlobalCalib(w_out, h_out, K);
+		setGlobalCameraCalib(w_out, h_out, K);
     setBaseline();
 	}
 
@@ -318,6 +398,36 @@ private:
 		}
 
 		printf("got %d images and %d timestamps and %d exposures.!\n", (int)getNumImages(), (int)timestamps.size(), (int)exposures.size());
+	}
+
+	inline void loadTimestamps(std::string eurocTimestampFile)
+	{
+		std::ifstream tr;
+		std::string timesFile = path.substr(0,path.find_last_of('/')) + "/data.csv";
+		tr.open(timesFile.c_str());
+		while(!tr.eof() && tr.good())
+		{
+			std::string line;
+			char buf[1000];
+			tr.getline(buf, 1000);
+
+			int id;
+			long long stampL;
+			double stamp;
+			float exposure = 0;
+			char filename[1000];
+
+			if(2 == sscanf(buf, "%lld,%s", &stampL, filename))
+			{
+				stamp = stampL * 1e-9;
+				timestamps.push_back(stamp);
+//				exposures.push_back(exposure);
+			}
+
+		}
+		tr.close();
+
+		printf("ImageFolder Reader: got %ld timestamps in %s.\n", timestamps.size(), eurocTimestampFile.c_str());
 	}
 
 

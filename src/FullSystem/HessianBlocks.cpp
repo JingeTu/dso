@@ -214,7 +214,7 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 
 
 
-	SE3 leftToLeft = target->PRE_worldToCam * host->PRE_camToWorld;
+	SE3 leftToLeft = target->PRE_T_CW * host->PRE_T_WC;
 	PRE_RTll = (leftToLeft.rotationMatrix()).cast<float>();
 	PRE_tTll = (leftToLeft.translation()).cast<float>();
 	distanceLL = leftToLeft.translation().norm();

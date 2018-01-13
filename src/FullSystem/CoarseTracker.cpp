@@ -993,7 +993,7 @@ namespace dso {
     for (FrameHessian *fh : frameHessians) {
       if (frame == fh) continue;
 
-      SE3 fhToNew = frame->PRE_worldToCam * fh->PRE_camToWorld;
+      SE3 fhToNew = frame->PRE_T_CW * fh->PRE_T_WC;
       Mat33f KRKi = (K[1] * fhToNew.rotationMatrix().cast<float>() * Ki[0]);
       Vec3f Kt = (K[1] * fhToNew.translation().cast<float>());
 

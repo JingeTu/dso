@@ -26,6 +26,7 @@
 #pragma once
 #include "util/settings.h"
 #include "util/NumType.h"
+#include "IMUMeasurement.h"
 
 namespace dso
 {
@@ -42,6 +43,10 @@ namespace dso
 	extern float hM3G;
 
 	extern float baseline;
+	extern SE3 T_SC0;
+	extern IMUParameters imuParameters;
 
-	void setGlobalCalib(int w, int h, const Eigen::Matrix3f &K );
+	void setGlobalCameraCalib(int w, int h, const Eigen::Matrix3f &K);
+
+	void setGlobalIMUCalib();
 }

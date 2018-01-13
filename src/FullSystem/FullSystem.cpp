@@ -131,6 +131,7 @@ namespace dso {
     coarseTracker_forNewKF = new CoarseTracker(wG[0], hG[0]);
     coarseInitializer = new CoarseInitializer(wG[0], hG[0]);
     pixelSelector = new PixelSelector(wG[0], hG[0]);
+    imuPropagation = new IMUPropagation();
 
     statistics_lastNumOptIts = 0;
     statistics_numDroppedPoints = 0;
@@ -166,6 +167,7 @@ namespace dso {
     maxIdJetVisDebug = -1;
     minIdJetVisTracker = -1;
     maxIdJetVisTracker = -1;
+
   }
 
   FullSystem::~FullSystem() {
@@ -250,11 +252,11 @@ namespace dso {
       if (setting_onlyLogKFPoses && s->marginalizedAt == s->id) continue;
 
       myfile << s->timestamp <<
-             " " << s->camToWorld.translation().transpose() <<
-             " " << s->camToWorld.so3().unit_quaternion().x() <<
-             " " << s->camToWorld.so3().unit_quaternion().y() <<
-             " " << s->camToWorld.so3().unit_quaternion().z() <<
-             " " << s->camToWorld.so3().unit_quaternion().w() << "\n";
+             " " << s->T_WC.translation().transpose() <<
+             " " << s->T_WC.so3().unit_quaternion().x() <<
+             " " << s->T_WC.so3().unit_quaternion().y() <<
+             " " << s->T_WC.so3().unit_quaternion().z() <<
+             " " << s->T_WC.so3().unit_quaternion().w() << "\n";
     }
     myfile.close();
   }
@@ -345,8 +347,8 @@ namespace dso {
       SE3 lastF_2_slast;
       {  // lock on global pose consistency!
         boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-        slast_2_sprelast = sprelast->camToWorld.inverse() * slast->camToWorld;
-        lastF_2_slast = slast->camToWorld.inverse() * lastF->shell->camToWorld;
+        slast_2_sprelast = sprelast->T_WC.inverse() * slast->T_WC;
+        lastF_2_slast = slast->T_WC.inverse() * lastF->shell->T_WC;
         aff_last_2_l = slast->aff_g2l;
       }
       SE3 fh_2_slast = slast_2_sprelast;// assumed to be the same as fh_2_slast.
@@ -393,7 +395,7 @@ namespace dso {
                                    SE3(Sophus::Quaterniond(1, rotDelta, 0, rotDelta),
                                        Vec3(0, 0, 0)));  // assume constant motion.
         lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast *
-                                  setting_kfGlobalWeight SE3(Sophus::Quaterniond(1, -rotDelta, rotDelta, 0),
+                                   SE3(Sophus::Quaterniond(1, -rotDelta, rotDelta, 0),
                                        Vec3(0, 0, 0)));  // assume constant motion.
         lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast *
                                    SE3(Sophus::Quaterniond(1, 0, -rotDelta, rotDelta),
@@ -529,7 +531,7 @@ namespace dso {
     fh->shell->camToTrackingRef = lastF_2_fh.inverse();
     fh->shell->trackingRef = lastF->shell;
     fh->shell->aff_g2l = aff_g2l;
-    fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
+    fh->shell->T_WC = fh->shell->trackingRef->T_WC * fh->shell->camToTrackingRef;
 
 
     if (coarseTracker->firstCoarseRMSE < 0)
@@ -545,7 +547,7 @@ namespace dso {
                            << fh->shell->id << " "
                            << fh->shell->timestamp << " "
                            << fh->ab_exposure << " "
-                           << fh->shell->camToWorld.log().transpose() << " "
+                           << fh->shell->T_WC.log().transpose() << " "
                            << aff_g2l.a << " "
                            << aff_g2l.b << " "
                            << achievedRes[0] << " "
@@ -579,8 +581,8 @@ namespace dso {
       SE3 lastF_2_slast;
       {  // lock on global pose consistency!
         boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-        slast_2_sprelast = sprelast->camToWorld.inverse() * slast->camToWorld;
-        lastF_2_slast = slast->camToWorld.inverse() * lastF->shell->camToWorld;
+        slast_2_sprelast = sprelast->T_WC.inverse() * slast->T_WC;
+        lastF_2_slast = slast->T_WC.inverse() * lastF->shell->T_WC;
         aff_last_2_l = slast->aff_g2l;
       }
       SE3 fh_2_slast = slast_2_sprelast;// assumed to be the same as fh_2_slast.
@@ -765,7 +767,7 @@ namespace dso {
     fh->shell->camToTrackingRef = lastF_2_fh.inverse();
     fh->shell->trackingRef = lastF->shell;
     fh->shell->aff_g2l = aff_g2l;
-    fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
+    fh->shell->T_WC = fh->shell->trackingRef->T_WC * fh->shell->camToTrackingRef;
 
 
     if (coarseTracker->firstCoarseRMSE < 0)
@@ -781,7 +783,7 @@ namespace dso {
                            << fh->shell->id << " "
                            << fh->shell->timestamp << " "
                            << fh->ab_exposure << " "
-                           << fh->shell->camToWorld.log().transpose() << " "
+                           << fh->shell->T_WC.log().transpose() << " "
                            << aff_g2l.a << " "
                            << aff_g2l.b << " "
                            << achievedRes[0] << " "
@@ -811,7 +813,7 @@ namespace dso {
     {
       int trace_total = 0, trace_good = 0, trace_oob = 0, trace_out = 0, trace_skip = 0, trace_badcondition = 0, trace_uninitialized = 0;
 
-      SE3 hostToNew = fh->PRE_worldToCam * host->PRE_camToWorld;
+      SE3 hostToNew = fh->PRE_T_CW * host->PRE_T_WC;
       Mat33f KRKi = K * hostToNew.rotationMatrix().cast<float>() * K.inverse();
       Mat33f KRi = K * hostToNew.rotationMatrix().inverse().cast<float>();
       Vec3f Kt = K * hostToNew.translation().cast<float>();
@@ -902,7 +904,7 @@ namespace dso {
     for (FrameHessian *host : frameHessians)    // go through all active frames
     {
 
-      SE3 hostToNew = fh->PRE_worldToCam * host->PRE_camToWorld;
+      SE3 hostToNew = fh->PRE_T_CW * host->PRE_T_WC;
       Mat33f KRKi = K * hostToNew.rotationMatrix().cast<float>() * K.inverse();
       Vec3f Kt = K * hostToNew.translation().cast<float>();
 
@@ -984,7 +986,7 @@ namespace dso {
     {
       if (host == newestHs) continue;
 
-      SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
+      SE3 fhToNew = newestHs->PRE_T_CW * host->PRE_T_WC;
       Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
       Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
@@ -1183,7 +1185,7 @@ namespace dso {
     FrameHessian *fh = new FrameHessian();
     FrameHessian *fhRight = new FrameHessian();
     FrameShell *shell = new FrameShell();
-    shell->camToWorld = SE3();    // no lock required, as fh is not used anywhere yet.
+    shell->T_WC = SE3();    // no lock required, as fh is not used anywhere yet.
     shell->aff_g2l = AffLight(0, 0);
     shell->marginalizedAt = shell->id = allFrameHistory.size();
     shell->timestamp = image->timestamp;
@@ -1285,7 +1287,7 @@ namespace dso {
     return;
   }
 
-  void FullSystem::addActiveFrame(ImageAndExposure *image, ImageAndExposure *imageRight, int id) {
+  void FullSystem::addActiveFrame(ImageAndExposure *image, ImageAndExposure *imageRight, std::vector<IMUMeasurement> &imuMeasurements, int id) {
 
 
 //    cv::Mat matLeft(image->h, image->w, CV_32F, image->image);
@@ -1307,11 +1309,12 @@ namespace dso {
     if (isLost) return;
     boost::unique_lock<boost::mutex> lock(trackMutex);
 
+//    printf("addActive Frame left timestamp: %lf, right timestamp: %lf\n", image->timestamp, imageRight->timestamp);
 
     // =========================== add into allFrameHistory =========================
     FrameHessian *fh = new FrameHessian();
     FrameShell *shell = new FrameShell();
-    shell->camToWorld = SE3();    // no lock required, as fh is not used anywhere yet.
+    shell->T_WC = SE3();    // no lock required, as fh is not used anywhere yet.
     shell->aff_g2l = AffLight(0, 0);
     shell->marginalizedAt = shell->id = allFrameHistory.size();
     shell->timestamp = image->timestamp;
@@ -1336,6 +1339,10 @@ namespace dso {
       // use initializer!
       if (coarseInitializer->frameID < 0)  // first frame set. fh is kept by coarseInitializer.
       {
+        //- Initialize IMU
+        Sophus::Quaterniond q_WS = imuPropagation->initializeRollPitchFromMeasurements(imuMeasurements);
+        // T_WS * T_SC0 = T_WC0
+        coarseInitializer->T_WC_ini = SE3(q_WS, Vec3(0, 0, 0)) * T_SC0;
         //- Add the First frame to the corseInitializer.
 //        coarseInitializer->setFirst(&Hcalib, fh);
         coarseInitializer->setFirstStereo(&Hcalib, fh, fhRight);
@@ -1361,6 +1368,9 @@ namespace dso {
         coarseTracker = coarseTracker_forNewKF;
         coarseTracker_forNewKF = tmp;
       }
+
+      // propagate imu
+
 
       // 确定 fh 与 coarseTracker->lastRef 的相对位置姿态。
       Vec4 tres = trackNewCoarseStereo(fh, fhRight);
@@ -1475,8 +1485,8 @@ namespace dso {
           {
             boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
             assert(fh->shell->trackingRef != 0);
-            fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-            fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l);
+            fh->shell->T_WC = fh->shell->trackingRef->T_WC * fh->shell->camToTrackingRef;
+            fh->setEvalPT_scaled(fh->shell->T_WC.inverse(), fh->shell->aff_g2l);
           }
           delete fh;
         }
@@ -1513,8 +1523,8 @@ namespace dso {
     {
       boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
       assert(fh->shell->trackingRef != 0);
-      fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-      fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l);
+      fh->shell->T_WC = fh->shell->trackingRef->T_WC * fh->shell->camToTrackingRef;
+      fh->setEvalPT_scaled(fh->shell->T_WC.inverse(), fh->shell->aff_g2l);
     }
 
     // 使用当前帧更新 frameHessians 中所有帧的所有 immaturePoints 的 idepth_max 和 idepth_min
@@ -1529,8 +1539,8 @@ namespace dso {
     {
       boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
       assert(fh->shell->trackingRef != 0);
-      fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-      fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l);
+      fh->shell->T_WC = fh->shell->trackingRef->T_WC * fh->shell->camToTrackingRef;
+      fh->setEvalPT_scaled(fh->shell->T_WC.inverse(), fh->shell->aff_g2l);
     }
 
     // 使用当前帧更新 frameHessians 中所有帧的所有 immaturePoints 的 idepth_max 和 idepth_min
@@ -1756,22 +1766,22 @@ namespace dso {
       ef->insertPoint(ph);
     }
 
-    SE3 firstToNew = coarseInitializer->thisToNext;
+    SE3 T_10 = coarseInitializer->T_10;
 
     // really no lock required, as we are initializing.
     {
       boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-      firstFrame->shell->camToWorld = SE3();
+      firstFrame->shell->T_WC = coarseInitializer->T_WC_ini; // already used IMU initialize this
       firstFrame->shell->aff_g2l = AffLight(0, 0);
-      firstFrame->setEvalPT_scaled(firstFrame->shell->camToWorld.inverse(), firstFrame->shell->aff_g2l);
+      firstFrame->setEvalPT_scaled(firstFrame->shell->T_WC.inverse(), firstFrame->shell->aff_g2l);
       firstFrame->shell->trackingRef = 0;
       firstFrame->shell->camToTrackingRef = SE3();
 
-//      newFrame->shell->camToWorld = firstToNew.inverse();
-//      newFrame->shell->aff_g2l = AffLight(0, 0);
-//      newFrame->setEvalPT_scaled(newFrame->shell->camToWorld.inverse(), newFrame->shell->aff_g2l);
-//      newFrame->shell->trackingRef = firstFrame->shell;
-//      newFrame->shell->camToTrackingRef = firstToNew.inverse();
+      newFrame->shell->T_WC = T_10.inverse();
+      newFrame->shell->aff_g2l = AffLight(0, 0);
+      newFrame->setEvalPT_scaled(newFrame->shell->T_WC.inverse(), newFrame->shell->aff_g2l);
+      newFrame->shell->trackingRef = firstFrame->shell;
+      newFrame->shell->camToTrackingRef = T_10.inverse();
 
     }
 

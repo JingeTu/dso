@@ -25,6 +25,7 @@
 #pragma once
 
 #include "Eigen/Core"
+#include "Eigen/Geometry"
 #include "sophus/sim3.hpp"
 #include "sophus/se3.hpp"
 
@@ -102,7 +103,10 @@ typedef Eigen::Matrix<float,3,1> Vec3f;
 typedef Eigen::Matrix<float,2,1> Vec2f;
 typedef Eigen::Matrix<float,6,1> Vec6f;
 
-
+typedef Eigen::AngleAxisd AngleAxis;
+typedef Eigen::Matrix<double,9,1> SpeedAndBias;
+typedef Eigen::Matrix<double,3,3> covariance_t;
+typedef Eigen::Matrix<double,15,15> jacobian_t;
 
 typedef Eigen::Matrix<double,4,9> Mat49;
 typedef Eigen::Matrix<double,8,9> Mat89;

@@ -45,7 +45,7 @@
 
 namespace dso {
 
-  CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0, 0), thisToNext(SE3()) {
+  CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0, 0), T_10(SE3()) {
     for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
       points[lvl] = 0;
       numPoints[lvl] = 0;
@@ -63,6 +63,8 @@ namespace dso {
     wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_TRANS;
     wM.diagonal()[6] = SCALE_A;
     wM.diagonal()[7] = SCALE_B;
+
+    T_WC_ini = SE3();
   }
 
   CoarseInitializer::~CoarseInitializer() {
@@ -90,7 +92,7 @@ namespace dso {
     couplingWeight = 1;//*freeDebugParam5;
 
     if (!snapped) {
-      thisToNext.translation().setZero();
+      T_10.translation().setZero();
       for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
         int npts = numPoints[lvl];
         Pnt *ptsl = points[lvl];
@@ -103,7 +105,7 @@ namespace dso {
     }
 
 
-    SE3 refToNew_current = thisToNext;
+    SE3 refToNew_current = T_10;
     AffLight refToNew_aff_current = thisToNext_aff;
 
     if (firstFrame->ab_exposure > 0 && newFrame->ab_exposure > 0)
@@ -237,7 +239,7 @@ namespace dso {
     }
 
 
-    thisToNext = refToNew_current;
+    T_10 = refToNew_current;
     thisToNext_aff = refToNew_aff_current;
 
     for (int i = 0; i < pyrLevelsUsed - 1; i++)
@@ -553,7 +555,7 @@ namespace dso {
   }
 
   float CoarseInitializer::rescale() {
-    float factor = 20 * thisToNext.translation().norm();
+    float factor = 20 * T_10.translation().norm();
 //	float factori = 1.0f/factor;
 //	float factori2 = factori*factori;
 //
@@ -568,7 +570,7 @@ namespace dso {
 //			ptsl[i].lastHessian *= factori2;
 //		}
 //	}
-//	thisToNext.translation() *= factori;
+//	T_10.translation() *= factori;
 
     return factor;
   }
@@ -792,7 +794,7 @@ namespace dso {
     //- Find the nearest neighbour in the level + 1 as parent.
     makeNN();
 
-    thisToNext = SE3();
+    T_10 = SE3();
     snapped = false;
     frameID = snappedAt = 0;
 
@@ -933,7 +935,7 @@ namespace dso {
 
     makeNN();
 
-    thisToNext = SE3();
+    T_10 = SE3();
     snapped = false;
     frameID = snappedAt = 0;
 

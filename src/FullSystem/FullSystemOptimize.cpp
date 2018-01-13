@@ -550,7 +550,7 @@ float FullSystem::optimize(int mnumOptIts)
 	Vec10 newStateZero = Vec10::Zero();
 	newStateZero.segment<2>(6) = frameHessians.back()->get_state().segment<2>(6);
 
-	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_worldToCam,
+	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_T_CW,
 			newStateZero);
 	EFDeltaValid=false;
 	EFAdjointsValid=false;
@@ -587,7 +587,7 @@ float FullSystem::optimize(int mnumOptIts)
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		for(FrameHessian* fh : frameHessians)
 		{
-			fh->shell->camToWorld = fh->PRE_camToWorld;
+			fh->shell->T_WC = fh->PRE_T_WC;
 			fh->shell->aff_g2l = fh->aff_g2l();
 		}
 	}

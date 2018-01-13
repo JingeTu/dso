@@ -331,10 +331,16 @@ int main(int argc, char **argv) {
   // hook crtl+C.
   boost::thread exThread = boost::thread(exitThread);
 
-  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data_rec", calib, gammaCalib, vignette);
-  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data_rec", calibRight, gammaCalib, vignette);
+  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data_rec", source + "/cam0/data.csv",/*place for timestamp file*/ calib, gammaCalib, vignette);
+  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data_rec", source + "/cam1/data.csv",/*place for timestamp file*/ calibRight, gammaCalib, vignette);
   reader->setGlobalCalibration();
   reader_right->setGlobalCalibration();
+
+  IMUFileReader *reader_imu = new IMUFileReader(source + "/imu0/data.csv");
+  //- Initialize imu related parameters.
+  setGlobalIMUCalib();
+
+  double lastImuEndTimestamp = 0.0f;
 
   if (setting_photometricCalibration > 0 && reader->getPhotometricGamma() == 0) {
     printf("ERROR: dont't have photometric calibation. Need to use commandline options mode=1 or mode=2 ");
@@ -411,7 +417,8 @@ int main(int argc, char **argv) {
     double sInitializerOffset = 0;
 
 
-    for (int ii = 0; ii < (int) idsToPlay.size(); ii++) {
+    // 从第二帧开始吧，给 IMU 一点时间，初始化
+    for (int ii = 1; ii < (int) idsToPlay.size(); ii++) {
       if (!fullSystem->initialized)  // if not initialized: reset start time.
       {
         gettimeofday(&tv_start, NULL);
@@ -464,7 +471,12 @@ int main(int argc, char **argv) {
       bool MODE_STEREOMATCH = false;
 
       if (MODE_SLAM) {
-        if (!skipFrame) fullSystem->addActiveFrame(img_left, img_right, i);
+        // Add IMU measurements.
+        std::vector<IMUMeasurement> imuMeasurements;
+        reader_imu->getIMUMeasurementsBetween(lastImuEndTimestamp, img_left->timestamp, imuMeasurements);
+        lastImuEndTimestamp = img_left->timestamp;
+        std::cout << imuMeasurements.size() << std::endl;
+        if (!skipFrame) fullSystem->addActiveFrame(img_left, img_right, imuMeasurements, i);
       }
 
       if (MODE_STEREOMATCH) {
@@ -566,6 +578,8 @@ int main(int argc, char **argv) {
 
   printf("DELETE READER!\n");
   delete reader;
+  delete reader_right;
+  delete reader_imu;
 
   printf("EXIT NOW!\n");
   return 0;

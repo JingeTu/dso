@@ -23,20 +23,22 @@ void readCamSettings(const std::string &settingsfile, cv::Mat &T_BC, cv::Mat &K,
     cerr << e.msg << endl;
   }
 
-  cv::Mat intrinsics;
+  double fx, fy, cx, cy;
 
   cout << settings.isOpened() << endl;
 
-  settings["T_BS.data"] >> T_BC;
-  settings["intrinsics"] >> intrinsics;
-  settings["distortion_coefficients"] >> D;
+  settings["T_BS"] >> T_BC;
+  settings["camera.fu"] >> fx;
+  settings["camera.fv"] >> fy;
+  settings["camera.cu"] >> cx;
+  settings["camera.cv"] >> cy;
 
   K = cv::Mat::eye(3, 3, CV_32F);
 
-  K.at<float>(0, 0) = intrinsics.at<float>(0);
-  K.at<float>(1, 1) = intrinsics.at<float>(1);
-  K.at<float>(0, 2) = intrinsics.at<float>(2);
-  K.at<float>(1, 2) = intrinsics.at<float>(3);
+  K.at<float>(0, 0) = fx;
+  K.at<float>(1, 1) = fy;
+  K.at<float>(0, 2) = cx;
+  K.at<float>(1, 2) = cy;
 }
 
 bool readImageFilePathsSingle(const std::string &basedir, std::vector<std::string> &vec_files) {
@@ -106,7 +108,7 @@ int main(int argc, char **argv) {
   cv::Mat K0, K1;
   cv::Mat D0, D1;
 
-//  readCamSettings(cam0file, T_BC0, K0, D0);
+  readCamSettings("/home/jg/Desktop/dso_my_workspace/configs/EuRoC/cam0.yaml", T_BC0, K0, D0);
 
   int width = 752, height = 480;
 

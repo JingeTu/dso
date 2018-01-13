@@ -163,8 +163,8 @@ struct FrameHessian
 
 
 	// precalc values
-	SE3 PRE_worldToCam;
-	SE3 PRE_camToWorld;
+	SE3 PRE_T_CW;
+	SE3 PRE_T_WC;
 	std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
 	MinimalImageB3* debugImage;
 
@@ -187,8 +187,8 @@ struct FrameHessian
 		state_scaled[8] = SCALE_A * state[8];
 		state_scaled[9] = SCALE_B * state[9];
 
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
-		PRE_camToWorld = PRE_worldToCam.inverse();
+		PRE_T_CW = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
+		PRE_T_WC = PRE_T_CW.inverse();
 		//setCurrentNullspace();
 	};
 	inline void setStateScaled(const Vec10 &state_scaled)
@@ -202,8 +202,8 @@ struct FrameHessian
 		state[8] = SCALE_A_INVERSE * state_scaled[8];
 		state[9] = SCALE_B_INVERSE * state_scaled[9];
 
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
-		PRE_camToWorld = PRE_worldToCam.inverse();
+		PRE_T_CW = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
+		PRE_T_WC = PRE_T_CW.inverse();
 		//setCurrentNullspace();
 	};
 	inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state)
