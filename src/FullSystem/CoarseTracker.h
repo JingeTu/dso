@@ -87,6 +87,12 @@ public:
 	FrameHessian* newFrame;
 	int refFrameID;
 
+	//- This is jinge comment
+	/*
+	 * lastResiduals for 5 level image alignment.
+	 * Each is calculated as lastResiduals[lvl] = sqrtf((float) (resOld[0] / resOld[1]));
+	 * Its reprojection photometric error average.
+	 */
 	// act as pure ouptut
 	Vec5 lastResiduals;
 	Vec3 lastFlowIndicators;

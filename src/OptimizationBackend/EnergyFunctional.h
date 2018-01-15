@@ -77,7 +77,7 @@ public:
 	EFPoint* insertPoint(PointHessian* ph);
 
 	void dropResidual(EFResidual* r);
-	void marginalizeFrame(EFFrame* fh);
+	void marginalizeFrame(EFFrame* efF);
 	void removePoint(EFPoint* ph);
 
 

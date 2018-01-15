@@ -208,6 +208,7 @@ namespace dso {
     delete coarseInitializer;
     delete pixelSelector;
     delete ef;
+    delete imuPropagation;
   }
 
   void FullSystem::setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH) {
@@ -476,7 +477,8 @@ namespace dso {
 
       if (i != 0) {
         printf(
-            "RE-TRACK ATTEMPT %d with initOption %d and start-lvl %d (ab %f %f): %f %f %f %f %f -> %f %f %f %f %f \n",
+            "RE-TRACK ATTEMPT %d with initOption %d and start-lvl %d (ab %f %f), "
+                "\naverage pixel photometric error for each level: %f %f %f %f %f -> %f %f %f %f %f \n",
             i,
             i, pyrLevelsUsed - 1,
             aff_g2l_this.a, aff_g2l_this.b,
@@ -519,7 +521,7 @@ namespace dso {
     }
 
     if (!haveOneGood) {
-      printf("BIG ERROR! tracking failed entirely. Take predictred pose and hope we may somehow recover.\n");
+      printf("BIG ERROR! tracking failed entirely. Take predicted pose and hope we may somehow recover.\n");
       flowVecs = Vec3(0, 0, 0);
       aff_g2l = aff_last_2_l;
       lastF_2_fh = lastF_2_fh_tries[0];
@@ -1369,7 +1371,8 @@ namespace dso {
         coarseTracker_forNewKF = tmp;
       }
 
-      // propagate imu
+      // initialized propagate imu measurements first for trackNewCoarseStereo initial pose
+//      imuPropagation->propagate(imuMeasurements, )
 
 
       // 确定 fh 与 coarseTracker->lastRef 的相对位置姿态。
@@ -1416,6 +1419,7 @@ namespace dso {
 
     if (linearizeOperation) {
       if (goStepByStep && lastRefStopID != coarseTracker->refFrameID) {
+        printf("allFrameHistory.size() == %d\n", (int)allFrameHistory.size());
         MinimalImageF3 img(wG[0], hG[0], fh->dI);
         IOWrap::displayImage("frameToTrack", &img);
         while (true) {
@@ -1597,7 +1601,7 @@ namespace dso {
     // =========================== OPTIMIZE ALL =========================
 
     fh->frameEnergyTH = frameHessians.back()->frameEnergyTH;
-    float rmse = optimize(setting_maxOptIterations);
+    float rmse = optimize(setting_maxOptIterations); // setting_maxOptIterations == 6
 
 
 

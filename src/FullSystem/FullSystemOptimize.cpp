@@ -50,7 +50,7 @@ namespace dso
 
 
 void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointFrameResidual*>* toRemove, int min, int max, Vec10* stats, int tid)
-{
+{//- fixLinearization == false
 	for(int k=min;k<max;k++)
 	{
 		PointFrameResidual* r = activeResiduals[k];
@@ -62,7 +62,7 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 
 			if(r->efResidual->isActive())
 			{
-				if(r->isNew)
+				if(r->isNew) // NO USE: this is just calculate for display
 				{
 					PointHessian* p = r->point;
 					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u,p->v, 1);	// projected point assuming infinite depth.
@@ -78,7 +78,7 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 			}
 			else
 			{
-				toRemove[tid].push_back(activeResiduals[k]);
+				toRemove[tid].push_back(activeResiduals[k]); // tid: thread id for different thread
 			}
 		}
 	}
@@ -140,7 +140,7 @@ void FullSystem::setNewFrameEnergyTH()
 //			good, bad);
 }
 Vec3 FullSystem::linearizeAll(bool fixLinearization)
-{
+{ //- The most important this of this function is to calculate lastEnergyP
 	double lastEnergyP = 0;
 	double lastEnergyR = 0;
 	double num = 0;
@@ -161,11 +161,10 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 		lastEnergyP = stats[0];
 	}
 
-
 	setNewFrameEnergyTH();
 
 
-	if(fixLinearization)
+	if(fixLinearization) // false for optimize
 	{
 
 		for(PointFrameResidual* r : activeResiduals)
@@ -259,6 +258,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 		Hcalib.setValue(Hcalib.value_backup + stepfacC*Hcalib.step);
 		for(FrameHessian* fh : frameHessians)
 		{
+      //- 优化后更新位姿
 			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
 			sumA += fh->step[6]*fh->step[6];
 			sumB += fh->step[7]*fh->step[7];
@@ -427,7 +427,7 @@ float FullSystem::optimize(int mnumOptIts)
 		{
 			for(PointFrameResidual* r : ph->residuals)
 			{
-				if(!r->efResidual->isLinearized)
+				if(!r->efResidual->isLinearized) // default is false, after FullSystem::flagPointsForRemoval, becomes true
 				{
 					activeResiduals.push_back(r);
 					r->resetOOB();
@@ -441,12 +441,14 @@ float FullSystem::optimize(int mnumOptIts)
     if(!setting_debugout_runquiet)
         printf("OPTIMIZE %d pts, %d active res, %d lin res!\n",ef->nPoints,(int)activeResiduals.size(), numLRes);
 
-
+	// lastEnergy[0] = all point reprojection error, PointFrameResidual
+	// lastEnergy[1] = 0
+	// lastEnergy[2] = 0
 	Vec3 lastEnergy = linearizeAll(false);
 	double lastEnergyL = calcLEnergy();
 	double lastEnergyM = calcMEnergy();
 
-
+	printf("lastEnergy[0]: %lf, lastEnergyL: %lf, lastEnergyM: %lf\n", lastEnergy[0], lastEnergyL, lastEnergyM);
 
 
 

@@ -209,8 +209,8 @@ void EnergyFunctional::accumulateAF_MT(MatXX &H, VecX &b, bool MT)
 		accSSE_top_A->setZero(nFrames);
 		for(EFFrame* f : frames)
 			for(EFPoint* p : f->points)
-				accSSE_top_A->addPoint<0>(p,this);
-		accSSE_top_A->stitchDoubleMT(red,H,b,this,false,false);
+				accSSE_top_A->addPoint<0>(p,this); // 0 = active, 1 = linearized, 2=marginalize
+		accSSE_top_A->stitchDoubleMT(red,H,b,this,false,false); // IndexThreadReduce<Vec10>* red, MatXX &H, VecX &b, EnergyFunctional const * const EF, bool usePrior, bool MT
 		resInA = accSSE_top_A->nres[0];
 	}
 }
@@ -231,7 +231,7 @@ void EnergyFunctional::accumulateLF_MT(MatXX &H, VecX &b, bool MT)
 		accSSE_top_L->setZero(nFrames);
 		for(EFFrame* f : frames)
 			for(EFPoint* p : f->points)
-				accSSE_top_L->addPoint<1>(p,this);
+				accSSE_top_L->addPoint<1>(p,this); // 0 = active, 1 = linearized, 2=marginalize
 		accSSE_top_L->stitchDoubleMT(red,H,b,this,true,false);
 		resInL = accSSE_top_L->nres[0];
 	}
@@ -495,14 +495,14 @@ void EnergyFunctional::dropResidual(EFResidual* r)
 	r->data->efResidual=0;
 	delete r;
 }
-void EnergyFunctional::marginalizeFrame(EFFrame* fh)
+void EnergyFunctional::marginalizeFrame(EFFrame* efF)
 {
 
 	assert(EFDeltaValid);
 	assert(EFAdjointsValid);
 	assert(EFIndicesValid);
 
-	assert((int)fh->points.size()==0);
+	assert((int)efF->points.size()==0);
 	int ndim = nFrames*8+CPARS-8;// new dimension
 	int odim = nFrames*8+CPARS;// old dimension
 
@@ -511,12 +511,13 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 //	std::sort(eigenvaluesPre.data(), eigenvaluesPre.data()+eigenvaluesPre.size());
 //
 
+//  printf("bM.size(): %ld, %ld\n", bM.rows(), bM.cols());
+//  printf("HM.size(): %ld, %ld\n", HM.rows(), HM.cols());
 
-
-	if((int)fh->idx != (int)frames.size()-1)
+	if((int)efF->idx != (int)frames.size()-1)
 	{
-		int io = fh->idx*8+CPARS;	// index of frame to move to end
-		int ntail = 8*(nFrames-fh->idx-1);
+		int io = efF->idx*8+CPARS;	// index of frame to move to end
+		int ntail = 8*(nFrames-efF->idx-1);
 		assert((io+8+ntail) == nFrames*8+CPARS);
 
 		Vec8 bTmp = bM.segment<8>(io);
@@ -537,8 +538,8 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 
 
 //	// marginalize. First add prior here, instead of to active.
-    HM.bottomRightCorner<8,8>().diagonal() += fh->prior;
-    bM.tail<8>() += fh->prior.cwiseProduct(fh->delta_prior);
+    HM.bottomRightCorner<8,8>().diagonal() += efF->prior;
+    bM.tail<8>() += efF->prior.cwiseProduct(efF->delta_prior);
 
 
 
@@ -547,13 +548,14 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 
 	VecX SVec = (HM.diagonal().cwiseAbs()+VecX::Constant(HM.cols(), 10)).cwiseSqrt();
 	VecX SVecI = SVec.cwiseInverse();
+//	printf("SVec.size(): %ld, %ld\n", SVec.rows(), SVec.cols());
 
 
 //	std::cout << std::setprecision(16) << "SVec: " << SVec.transpose() << "\n\n";
 //	std::cout << std::setprecision(16) << "SVecI: " << SVecI.transpose() << "\n\n";
 
 	// scale!
-	MatXX HMScaled = SVecI.asDiagonal() * HM * SVecI.asDiagonal();
+ 	MatXX HMScaled = SVecI.asDiagonal() * HM * SVecI.asDiagonal();
 	VecX bMScaled =  SVecI.asDiagonal() * bM;
 
 	// invert bottom part!
@@ -576,14 +578,14 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	bM = bMScaled.head(ndim);
 
 	// remove from vector, without changing the order!
-	for(unsigned int i=fh->idx; i+1<frames.size();i++)
+	for(unsigned int i=efF->idx; i+1<frames.size();i++)
 	{
 		frames[i] = frames[i+1];
 		frames[i]->idx = i;
 	}
 	frames.pop_back();
 	nFrames--;
-	fh->data->efFrame=0;
+	efF->data->efFrame=0;
 
 	assert((int)frames.size()*8+CPARS == (int)HM.rows());
 	assert((int)frames.size()*8+CPARS == (int)HM.cols());
@@ -606,7 +608,7 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	EFDeltaValid=false;
 
 	makeIDX();
-	delete fh;
+	delete efF;
 }
 
 
@@ -640,7 +642,7 @@ void EnergyFunctional::marginalizePointsF()
 	accSSE_top_A->setZero(nFrames);
 	for(EFPoint* p : allPointsToMarg)
 	{
-		accSSE_top_A->addPoint<2>(p,this);
+		accSSE_top_A->addPoint<2>(p,this); // 0 = active, 1 = linearized, 2=marginalize
 		accSSE_bot->addPoint(p,false);
 		removePoint(p);
 	}
@@ -664,6 +666,8 @@ void EnergyFunctional::marginalizePointsF()
 			orthogonalize(&b, &H);
 
 	}
+
+//	printf("HM.size(): %ld, %ld\n", HM.cols(), HM.rows());
 
 	HM += setting_margWeightFac*H;
 	bM += setting_margWeightFac*b;
@@ -903,9 +907,10 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 
 	lastX = x;
 
-
+//	printf("x.size(): %ld, %ld\n", x.rows(), x.cols());
 	//resubstituteF(x, HCalib);
 	currentLambda= lambda;
+	//- 前面优化得到的结果存储在ｘ当中
 	resubstituteF_MT(x, HCalib,multiThreading);
 	currentLambda=0;
 

@@ -47,6 +47,8 @@ add_subdirectory(src/util)
 add_subdirectory(src/FullSystem)
 add_subdirectory(src/OptimizationBackend)
 add_subdirectory(src/IOWrapper)
+add_subdirectory(src/okvis_util)
+add_subdirectory(src/okvis_kinematics)
 
 #add_library(dso)
 #target_link_libraries(dso util FullSystem OptimizationBackend IOWrapper)
@@ -68,7 +70,9 @@ if (OpenCV_FOUND AND Pangolin_FOUND)
     #target_link_libraries(dso_dataset dso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
 
 	add_executable(dso_dataset_euroc ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin_euroc.cpp )
-	target_link_libraries(dso_dataset_euroc dso_util dso_FullSystem dso_IOWrapper dso_OptimizationBackend boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
+	target_link_libraries(dso_dataset_euroc dso_util dso_FullSystem dso_IOWrapper dso_OptimizationBackend
+			boost_system cxsparse
+			${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
 
 	add_executable(euroc_rectify ${PROJECT_SOURCE_DIR}/src/main_rectify_euroc_dataset.cpp)
 	target_link_libraries(euroc_rectify ${OpenCV_LIBS})

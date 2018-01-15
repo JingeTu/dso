@@ -74,7 +74,7 @@ class EFPoint;
 #define SCALE_B_INVERSE (1.0f / SCALE_B)
 
 
-struct FrameFramePrecalc
+struct FrameFramePrecalc //- Precalculate reporjection(from host to target) parameters.
 {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 	// static values

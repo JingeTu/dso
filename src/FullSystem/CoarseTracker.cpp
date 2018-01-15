@@ -643,7 +643,7 @@ namespace dso {
     makeCoarseDepthForFirstFrame(lastRef);
 
     refFrameID = lastRef->shell->id;
-    lastRef_aff_g2l = lastRef_aff_g2l;
+    lastRef_aff_g2l = lastRef->aff_g2l();
 
     firstCoarseRMSE = -1;
   }

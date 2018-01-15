@@ -52,7 +52,7 @@ typedef Sophus::SO3d SO3;
 
 
 
-#define CPARS 4
+#define CPARS 4 //-- Calibration Parameters
 
 
 typedef Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> MatXX;
@@ -105,7 +105,7 @@ typedef Eigen::Matrix<float,6,1> Vec6f;
 
 typedef Eigen::AngleAxisd AngleAxis;
 typedef Eigen::Matrix<double,9,1> SpeedAndBias;
-typedef Eigen::Matrix<double,3,3> covariance_t;
+typedef Eigen::Matrix<double,15,15> covariance_t;
 typedef Eigen::Matrix<double,15,15> jacobian_t;
 
 typedef Eigen::Matrix<double,4,9> Mat49;
