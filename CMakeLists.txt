@@ -40,6 +40,7 @@ include_directories(
 		${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
 		${EIGEN3_INCLUDE_DIR}
     ${PROJECT_SOURCE_DIR}/src/okvis_kinematics/include
+    ${PROJECT_SOURCE_DIR}/src/okvis_util/include
 )
 
 include_directories( ${CSPARSE_INCLUDE_DIR} ${CHOLMOD_INCLUDE_DIR})
@@ -49,7 +50,8 @@ add_subdirectory(src/FullSystem)
 add_subdirectory(src/OptimizationBackend)
 add_subdirectory(src/IOWrapper)
 add_subdirectory(src/okvis_util)
-# add_subdirectory(src/okvis_kinematics)
+add_subdirectory(src/okvis_kinematics)
+add_dependencies(okvis_kinematics okvis_util)
 
 #add_library(dso)
 #target_link_libraries(dso util FullSystem OptimizationBackend IOWrapper)

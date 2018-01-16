@@ -9,16 +9,17 @@ SET(BUILD_TYPE Release)
 #include_directories(${EIGEN_INCLUDE_DIR})
 
 # build the library
-add_library(${PROJECT_NAME} STATIC include/okvis/kinematics/implementation/Transformation.hpp
-include/okvis/kinematics/operators.hpp
-include/okvis/kinematics/Transformation.hpp)
+#add_library(${PROJECT_NAME} STATIC include/okvis/kinematics/implementation/Transformation.hpp
+#include/okvis/kinematics/operators.hpp
+#include/okvis/kinematics/Transformation.hpp)
+add_library(${PROJECT_NAME} STATIC src/dependency-tracker.cc)
 
-SET_TARGET_PROPERTIES(okvis_kinematics PROPERTIES LINKER_LANGUAGE CXX)
+# SET_TARGET_PROPERTIES(okvis_kinematics PROPERTIES LINKER_LANGUAGE CXX)
 
 # and link it                     
-#target_link_libraries(${PROJECT_NAME}
-#  PUBLIC okvis_util
-#)
+target_link_libraries(${PROJECT_NAME}
+  PUBLIC okvis_util
+)
 
 # installation if required
 #install(TARGETS ${PROJECT_NAME}
