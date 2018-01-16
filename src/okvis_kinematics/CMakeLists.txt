@@ -1,13 +1,19 @@
-cmake_minimum_required(VERSION 2.8.11)
+CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
 project(okvis_kinematics)
+
+SET(BUILD_TYPE Release)
 
 # require Eigen3
 #find_package( Eigen REQUIRED )
 #include_directories(${EIGEN_INCLUDE_DIR})
 
 # build the library
-#add_library(${PROJECT_NAME} STATIC include/okvis/kinematics/implementation/Transformation.hpp)
+add_library(${PROJECT_NAME} STATIC include/okvis/kinematics/implementation/Transformation.hpp
+include/okvis/kinematics/operators.hpp
+include/okvis/kinematics/Transformation.hpp)
+
+SET_TARGET_PROPERTIES(okvis_kinematics PROPERTIES LINKER_LANGUAGE CXX)
 
 # and link it                     
 #target_link_libraries(${PROJECT_NAME}

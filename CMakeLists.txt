@@ -39,6 +39,7 @@ include_directories(
 		${PROJECT_SOURCE_DIR}/thirdparty/Sophus
 		${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
 		${EIGEN3_INCLUDE_DIR}
+    ${PROJECT_SOURCE_DIR}/src/okvis_kinematics/include
 )
 
 include_directories( ${CSPARSE_INCLUDE_DIR} ${CHOLMOD_INCLUDE_DIR})
@@ -48,13 +49,22 @@ add_subdirectory(src/FullSystem)
 add_subdirectory(src/OptimizationBackend)
 add_subdirectory(src/IOWrapper)
 add_subdirectory(src/okvis_util)
-add_subdirectory(src/okvis_kinematics)
+# add_subdirectory(src/okvis_kinematics)
 
 #add_library(dso)
 #target_link_libraries(dso util FullSystem OptimizationBackend IOWrapper)
 
 #set_property( TARGET dso APPEND_STRING PROPERTY COMPILE_FLAGS -Wall )
 
+# decide if we have ziplib.
+if (LIBZIP_LIBRARY)
+    message("--- found ziplib (${LIBZIP_VERSION}), compiling with zip capability.")
+    add_definitions(-DHAS_ZIPLIB=1)
+    include_directories( ${LIBZIP_INCLUDE_DIR_ZIP} ${LIBZIP_INCLUDE_DIR_ZIPCONF} ) 
+else()
+    message("--- not found ziplib (${LIBZIP_LIBRARY}), compiling without zip capability.")
+    set(LIBZIP_LIBRARY "")
+endif()
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
     set(BOOST_THREAD_LIBRARY boost_thread-mt)
@@ -70,9 +80,7 @@ if (OpenCV_FOUND AND Pangolin_FOUND)
     #target_link_libraries(dso_dataset dso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
 
 	add_executable(dso_dataset_euroc ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin_euroc.cpp )
-	target_link_libraries(dso_dataset_euroc dso_util dso_FullSystem dso_IOWrapper dso_OptimizationBackend
-			boost_system cxsparse
-			${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
+	target_link_libraries(dso_dataset_euroc dso_util dso_FullSystem dso_IOWrapper dso_OptimizationBackend boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
 
 	add_executable(euroc_rectify ${PROJECT_SOURCE_DIR}/src/main_rectify_euroc_dataset.cpp)
 	target_link_libraries(euroc_rectify ${OpenCV_LIBS})
