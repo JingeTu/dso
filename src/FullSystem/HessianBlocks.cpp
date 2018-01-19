@@ -42,6 +42,8 @@ PointHessian::PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hc
 	maxRelBaseline=0;
 	numGoodResiduals=0;
 
+	rightFrameResidual=0;
+
 	// set static values & initialization.
 	u = rawPoint->u;
 	v = rawPoint->v;

@@ -87,7 +87,13 @@ void EFPoint::takeData()
 
 void EFResidual::fixLinearizationF(EnergyFunctional* ef)
 {
-	Vec8f dp = ef->adHTdeltaF[hostIDX+ef->nFrames*targetIDX];
+	Vec8f dp;
+	if (targetIDX == -1) { //- static stereo residual
+		dp = ef->adHTdeltaF[hostIDX+ef->nFrames*hostIDX];
+	}
+	else { //- temporal stereo residual
+		dp = ef->adHTdeltaF[hostIDX+ef->nFrames*targetIDX];
+	}
 
 	// compute Jp*delta
 	__m128 Jp_delta_x = _mm_set1_ps(J->Jpdxi[0].dot(dp.head<6>())

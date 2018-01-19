@@ -64,11 +64,22 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint* p, bool shiftPriorToZero, int ti
 		if(!r1->isActive()) continue;
 		int r1ht = r1->hostIDX + r1->targetIDX*nframes[tid];
 
+		if (r1ht > 0) { //- temporal stereo residual
+			//- do nothing
+		}
+		else { //- static stereo residual
+			r1ht = r1->hostIDX + r1->hostIDX*nframes[tid];
+		}
+
 		for(EFResidual* r2 : p->residualsAll)
 		{
 			if(!r2->isActive()) continue;
-
-			accD[tid][r1ht+r2->targetIDX*nFrames2].update(r1->JpJdF, r2->JpJdF, p->HdiF);
+			if (r2->targetIDX == -1) { //- static stereo residual
+				accD[tid][r1ht+r2->hostIDX*nFrames2].update(r1->JpJdF, r2->JpJdF, p->HdiF);
+			}
+			else {
+				accD[tid][r1ht+r2->targetIDX*nFrames2].update(r1->JpJdF, r2->JpJdF, p->HdiF);
+			}
 		}
 
 		accE[tid][r1ht].update(r1->JpJdF, Hcd, p->HdiF);

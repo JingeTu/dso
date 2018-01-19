@@ -78,6 +78,7 @@ public:
 
 
 	bool isNew;
+	bool staticStereo; //- indicate if this residual is the static stereo residual instead of temperal stereo residual
 
 
 	Eigen::Vector2f projectedTo[MAX_RES_PER_POINT];
@@ -87,6 +88,7 @@ public:
 	PointFrameResidual();
 	PointFrameResidual(PointHessian* point_, FrameHessian* host_, FrameHessian* target_);
 	double linearize(CalibHessian* HCalib);
+	double linearizeStatic(CalibHessian* HCalib);
 
 
 	void resetOOB()

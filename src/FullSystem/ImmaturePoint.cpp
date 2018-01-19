@@ -55,6 +55,7 @@ namespace dso {
           setting_outlierTHSumComponent / (setting_outlierTHSumComponent + ptc.tail<2>().squaredNorm()));
     }
 
+#if USE_NCC
     //- Get patternNCCHostNormalized from host
     for (int idx = 0; idx < patternNumNCC; idx++) {
       int dx = patternPNCC[idx][0];
@@ -66,18 +67,19 @@ namespace dso {
       patternNCCHostNormalized[idx] = ptc[0];
     }
     patternNCCHostNormalized.normalize();
+#endif
 
     energyTH = patternNum * setting_outlierTH;
     energyTH *= setting_overallEnergyTHWeight * setting_overallEnergyTHWeight;
 
-    idepth_GT = 0;
+//    idepth_GT = 0;
     quality = 10000;
   }
 
   ImmaturePoint::~ImmaturePoint() {
   }
 
-
+#if USE_NCC
   // modeRight == true, from left to right, modeRight == false, from right to left
   ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frameRight, Mat33f K, bool modeRight) {
     // KRKi
@@ -377,8 +379,7 @@ namespace dso {
     idepth_stereo = (u_stereo - bestU) / bf;
     return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
   }
-
-/*
+#else
   // modeRight == true, from left to right, modeRight == false, from right to left
   ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frame, Mat33f K, bool modeRight) {
 
@@ -677,7 +678,8 @@ namespace dso {
     idepth_stereo = (u_stereo - bestU)/bf;
     return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
   }
-*/
+#endif
+
 /*
  * returns
  * * OOB -> point is optimized and marginalized

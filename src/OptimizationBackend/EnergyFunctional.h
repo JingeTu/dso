@@ -73,6 +73,7 @@ public:
 
 
 	EFResidual* insertResidual(PointFrameResidual* r);
+	EFResidual* insertStaticResidual(PointFrameResidual* r);
 	EFFrame* insertFrame(FrameHessian* fh, CalibHessian* Hcalib);
 	EFPoint* insertPoint(PointHessian* ph);
 

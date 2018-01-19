@@ -33,7 +33,7 @@ struct RawResidualJacobian
 {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 	// ================== new structure: save independently =============.
-	VecNRf resF;
+	VecNRf resF; // typedef Eigen::Matrix<float,MAX_RES_PER_POINT,1> VecNRf; MAX_RES_PER_POINT == 8
 
 	// the two rows of d[x,y]/d[xi].
 	Vec6f Jpdxi[2];			// 2x6

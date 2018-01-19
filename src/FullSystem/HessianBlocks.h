@@ -119,7 +119,8 @@ struct FrameHessian
 	Eigen::Vector3f* dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
 	Eigen::Vector3f* dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.
 	float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
-
+	FrameHessian* rightFrame; //- Point to right frame, NULL indicates this is a right frame.
+	FrameHessian* leftFrame;
 
 
 
@@ -250,8 +251,8 @@ struct FrameHessian
 		frameID = -1;
 		efFrame = 0;
 		frameEnergyTH = 8*8*patternNum;
-
-
+		rightFrame = 0;
+		leftFrame = 0;
 
 		debugImage=0;
 	};
@@ -456,7 +457,7 @@ struct PointHessian
 
 	std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
 	std::pair<PointFrameResidual*, ResState> lastResiduals[2]; 	// contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
-
+	PointFrameResidual* rightFrameResidual;
 
 	void release();
 	PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hcalib);

@@ -24,7 +24,7 @@
 
 
 #include "FullSystem/FullSystem.h"
- 
+
 #include "stdio.h"
 #include "util/globalFuncs.h"
 #include <Eigen/LU>
@@ -54,7 +54,10 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 	for(int k=min;k<max;k++)
 	{
 		PointFrameResidual* r = activeResiduals[k];
-		(*stats)[0] += r->linearize(&Hcalib);
+		if (r->host->rightFrame == r->target) // static residual do something else
+      (*stats)[0] += r->linearizeStatic(&Hcalib);
+		else
+			(*stats)[0] += r->linearize(&Hcalib);
 
 		if(fixLinearization)
 		{
@@ -251,6 +254,9 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 
                 ph->setIdepthZero(ph->idepth_backup + step);
 			}
+
+      assert(fh->rightFrame != 0);
+      fh->rightFrame->setState(fh->rightFrame->state_backup + step);
 		}
 	}
 	else
@@ -328,6 +334,8 @@ void FullSystem::backupState(bool backupLastStep)
 					ph->idepth_backup = ph->idepth;
 					ph->step_backup = ph->step;
 				}
+        fh->rightFrame->step_backup = fh->rightFrame->step;
+        fh->rightFrame->state_backup = fh->rightFrame->get_state();
 			}
 		}
 		else
@@ -343,6 +351,8 @@ void FullSystem::backupState(bool backupLastStep)
 					ph->idepth_backup = ph->idepth;
 					ph->step_backup=0;
 				}
+        fh->rightFrame->step_backup.setZero();
+        fh->rightFrame->state_backup = fh->rightFrame->get_state();
 			}
 		}
 	}
@@ -354,6 +364,7 @@ void FullSystem::backupState(bool backupLastStep)
 			fh->state_backup = fh->get_state();
 			for(PointHessian* ph : fh->pointHessians)
 				ph->idepth_backup = ph->idepth;
+      fh->rightFrame->state_backup = fh->rightFrame->get_state();
 		}
 	}
 }
@@ -371,7 +382,7 @@ void FullSystem::loadSateBackup()
 
             ph->setIdepthZero(ph->idepth_backup);
 		}
-
+    fh->rightFrame->setState(fh->state_backup);
 	}
 
 
@@ -474,6 +485,7 @@ float FullSystem::optimize(int mnumOptIts)
 	for(int iteration=0;iteration<mnumOptIts;iteration++)
 	{
 		// solve!
+    //- also back up right frames' states
 		backupState(iteration!=0);
 		//solveSystemNew(0);
 		solveSystem(iteration, lambda);

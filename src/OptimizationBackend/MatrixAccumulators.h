@@ -856,6 +856,12 @@ inline void finish()
   	  	  const float TR01, const float TR11,
   	  	  const float TR02, const float TR12 )
   {
+    // acc[tid][htIDX].updateTopRight(
+    //   rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(),
+    //   rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
+    //   rJ->JabJIdx(0,0), rJ->JabJIdx(0,1),
+    //   rJ->JabJIdx(1,0), rJ->JabJIdx(1,1),
+    //   JI_r[0], JI_r[1]);
 	  TopRight_Data[0] += x4[0]*TR00 + y4[0]*TR10;
 	  TopRight_Data[1] += x4[0]*TR01 + y4[0]*TR11;
 	  TopRight_Data[2] += x4[0]*TR02 + y4[0]*TR12;
@@ -906,6 +912,14 @@ inline void finish()
 		  const float a12,
 		  const float a22)
   {
+		// acc[tid][htIDX].updateBotRight(rJ->Jab2(0,0), rJ->Jab2(0,1), Jab_r[0],
+		// rJ->Jab2(1,1), Jab_r[1],rr);
+		// H(10,10) = BotRight_Data1m[0];
+		// H(10,11) = H(11,10) = BotRight_Data1m[1];
+		// H(10,12) = H(12,10) = BotRight_Data1m[2];
+		// H(11,11) = BotRight_Data1m[3];
+		// H(11,12) = H(12,11) = BotRight_Data1m[4];
+		// H(12,12) = BotRight_Data1m[5];
 	  BotRight_Data[0] += a00;
 	  BotRight_Data[1] += a01;
 	  BotRight_Data[2] += a02;

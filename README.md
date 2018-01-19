@@ -4,7 +4,11 @@ Add code snippets from https://github.com/HorizonAD/stereo_dso, make this stereo
 
 Add support for kitti and euroc.
 
-You should rectify euroc dataset first. Then put them into the system. Because the system don't align the two images. It only rectifies them.
+You should rectify euroc dataset first. Then put them into the system. Because the system doesn't align the two images. It only rectifies them.
+
+For VIO should have look at this issue: https://github.com/JakobEngel/dso/issues/65.
+
+Add static stereo residual to optimization, currently without lambda.
 
 # DSO: Direct Sparse Odometry
 

@@ -105,7 +105,7 @@ void PangolinDSOViewer::run()
 {
 	printf("START PANGOLIN!\n");
 
-	pangolin::CreateWindowAndBind("Main",2*w,2*h);
+	pangolin::CreateWindowAndBind("Main Stereo DSO",2*w,2*h);
 	const int UI_WIDTH = 180;
 
 	glEnable(GL_DEPTH_TEST);
@@ -162,7 +162,7 @@ void PangolinDSOViewer::run()
 	pangolin::Var<bool> settings_showLiveVideo("ui.showVideo",true,true);
   pangolin::Var<bool> settings_showLiveResidual("ui.showResidual",false,true);
 
-	pangolin::Var<bool> settings_showFramesWindow("ui.showFramesWindow",true,true);
+	pangolin::Var<bool> settings_showFramesWindow("ui.showFramesWindow",false,true);
 	pangolin::Var<bool> settings_showFullTracking("ui.showFullTracking",false,true);
 	pangolin::Var<bool> settings_showCoarseTracking("ui.showCoarseTracking",false,true);
 

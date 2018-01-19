@@ -151,6 +151,8 @@ namespace dso {
         for (int i = 0; i < 8; i++) Hl(i, i) *= (1 + lambda);
         Hl -= Hsc * (1 / (1 + lambda));
         Vec8f bl = b - bsc * (1 / (1 + lambda));
+//        Hl -= Hsc;
+//        Vec8f bl = b - bsc;
 
         Hl = wM * Hl * wM * (0.01f / (w[lvl] * h[lvl]));
         bl = wM * bl * (0.01f / (w[lvl] * h[lvl]));
@@ -484,10 +486,10 @@ namespace dso {
     for (int i = 0; i < npts; i++) {
       Pnt *point = ptsl + i;
       if (!point->isGood_new) {
-        E.updateSingle((float) (point->energy[1]));
+        EAlpha.updateSingle((float) (point->energy[1])); // original is E, see issue#107, https://github.com/JakobEngel/dso/issues/107
       } else {
         point->energy_new[1] = (point->idepth_new - 1) * (point->idepth_new - 1);
-        E.updateSingle((float) (point->energy_new[1]));
+        EAlpha.updateSingle((float) (point->energy_new[1])); // original is E
       }
     }
     EAlpha.finish();
@@ -980,7 +982,7 @@ namespace dso {
 
       float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
       float step = -b * JbBuffer[i][9] / (1 + lambda);
-
+//      float step = -b * JbBuffer[i][9];
 
       float maxstep = maxPixelStep * pts[i].maxstep;
       if (maxstep > idMaxStep) maxstep = idMaxStep;

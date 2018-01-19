@@ -26,6 +26,7 @@
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 #include <iostream>
+#include <FullSystem/HessianBlocks.h>
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
 #include "SSE2NEON.h"
@@ -52,15 +53,15 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 
 	for(EFResidual* r : p->residualsAll)
 	{
-		if(mode==0)
+		if(mode==0) // active
 		{
 			if(r->isLinearized || !r->isActive()) continue;
 		}
-		if(mode==1)
+		if(mode==1) // linearized
 		{
 			if(!r->isLinearized || !r->isActive()) continue;
 		}
-		if(mode==2)
+		if(mode==2) // marginalize
 		{
 			if(!r->isActive()) continue;
 			assert(r->isLinearized);
@@ -69,33 +70,54 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 
 		RawResidualJacobian* rJ = r->J;
 		int htIDX = r->hostIDX + r->targetIDX*nframes[tid];
-		Mat18f dp = ef->adHTdeltaF[htIDX];
 
 
 
 		VecNRf resApprox;
-		if(mode==0)
+		if(mode==0) // active
 			resApprox = rJ->resF;
-		if(mode==2)
+		if(mode==2) // marginalize
 			resApprox = r->res_toZeroF;
-		if(mode==1)
-		{
-			// compute Jp*delta
-			__m128 Jp_delta_x = _mm_set1_ps(rJ->Jpdxi[0].dot(dp.head<6>())+rJ->Jpdc[0].dot(dc)+rJ->Jpdd[0]*dd);
-			__m128 Jp_delta_y = _mm_set1_ps(rJ->Jpdxi[1].dot(dp.head<6>())+rJ->Jpdc[1].dot(dc)+rJ->Jpdd[1]*dd);
-			__m128 delta_a = _mm_set1_ps((float)(dp[6]));
-			__m128 delta_b = _mm_set1_ps((float)(dp[7]));
+		if(mode==1) // linearized
+		{ //- Want to know what linearized mean? Here, just think about it.
+      if (htIDX > 0) { //- temporal stereo residual
+        Mat18f dp = ef->adHTdeltaF[htIDX];
+        // compute Jp*delta
+        __m128 Jp_delta_x = _mm_set1_ps(rJ->Jpdxi[0].dot(dp.head<6>())+rJ->Jpdc[0].dot(dc)+rJ->Jpdd[0]*dd);
+        __m128 Jp_delta_y = _mm_set1_ps(rJ->Jpdxi[1].dot(dp.head<6>())+rJ->Jpdc[1].dot(dc)+rJ->Jpdd[1]*dd);
+        __m128 delta_a = _mm_set1_ps((float)(dp[6]));
+        __m128 delta_b = _mm_set1_ps((float)(dp[7]));
 
-			for(int i=0;i<patternNum;i+=4)
-			{
-				// PATTERN: rtz = resF - [JI*Jp Ja]*delta.
-				__m128 rtz = _mm_load_ps(((float*)&r->res_toZeroF)+i);
-				rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JIdx))+i),Jp_delta_x));
-				rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JIdx+1))+i),Jp_delta_y));
-				rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JabF))+i),delta_a));
-				rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JabF+1))+i),delta_b));
-				_mm_store_ps(((float*)&resApprox)+i, rtz);
-			}
+        for(int i=0;i<patternNum;i+=4)
+        {
+          // PATTERN: rtz = resF - [JI*Jp Ja]*delta.
+          __m128 rtz = _mm_load_ps(((float*)&r->res_toZeroF)+i);
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JIdx))+i),Jp_delta_x));
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JIdx+1))+i),Jp_delta_y));
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JabF))+i),delta_a));
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JabF+1))+i),delta_b));
+          _mm_store_ps(((float*)&resApprox)+i, rtz);
+        }
+      }
+      else { //- static stereo residual
+        Mat18f dp = ef->adHTdeltaF[htIDX];
+        // compute Jp*delta
+        __m128 Jp_delta_x = _mm_set1_ps(rJ->Jpdc[0].dot(dc)+rJ->Jpdd[0]*dd);
+        __m128 Jp_delta_y = _mm_set1_ps(rJ->Jpdc[1].dot(dc)+rJ->Jpdd[1]*dd);
+        __m128 delta_a = _mm_set1_ps(0.0f);
+        __m128 delta_b = _mm_set1_ps(0.0f);
+
+        for(int i=0;i<patternNum;i+=4)
+        {
+          // PATTERN: rtz = resF - [JI*Jp Ja]*delta.
+          __m128 rtz = _mm_load_ps(((float*)&r->res_toZeroF)+i);
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JIdx))+i),Jp_delta_x));
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JIdx+1))+i),Jp_delta_y));
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JabF))+i),delta_a));
+          rtz = _mm_add_ps(rtz,_mm_mul_ps(_mm_load_ps(((float*)(rJ->JabF+1))+i),delta_b));
+          _mm_store_ps(((float*)&resApprox)+i, rtz);
+        }
+      }
 		}
 
 		// need to compute JI^T * r, and Jab^T * r. (both are 2-vectors).
@@ -111,22 +133,40 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 			rr += resApprox[i]*resApprox[i];
 		}
 
+    if (htIDX > 0) { //- temporal stereo residual
+      acc[tid][htIDX].update(
+          rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(),
+          rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
+          rJ->JIdx2(0,0),rJ->JIdx2(0,1),rJ->JIdx2(1,1));
 
-		acc[tid][htIDX].update(
-				rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(),
-				rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
-				rJ->JIdx2(0,0),rJ->JIdx2(0,1),rJ->JIdx2(1,1));
+      acc[tid][htIDX].updateBotRight(
+          rJ->Jab2(0,0), rJ->Jab2(0,1), Jab_r[0],
+          rJ->Jab2(1,1), Jab_r[1],rr);
 
-		acc[tid][htIDX].updateBotRight(
-				rJ->Jab2(0,0), rJ->Jab2(0,1), Jab_r[0],
-				rJ->Jab2(1,1), Jab_r[1],rr);
+      acc[tid][htIDX].updateTopRight(
+          rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(),
+          rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
+          rJ->JabJIdx(0,0), rJ->JabJIdx(0,1),
+          rJ->JabJIdx(1,0), rJ->JabJIdx(1,1),
+          JI_r[0], JI_r[1]);
+    }
+    else { //- static stereo residual
+      acc[tid][r->hostIDX + r->hostIDX*nframes[tid]].update(
+          rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(),
+          rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
+          rJ->JIdx2(0,0),rJ->JIdx2(0,1),rJ->JIdx2(1,1));
 
-		acc[tid][htIDX].updateTopRight(
-				rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(),
-				rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
-				rJ->JabJIdx(0,0), rJ->JabJIdx(0,1),
-				rJ->JabJIdx(1,0), rJ->JabJIdx(1,1),
-				JI_r[0], JI_r[1]);
+      acc[tid][r->hostIDX + r->hostIDX*nframes[tid]].updateBotRight(
+          rJ->Jab2(0,0), rJ->Jab2(0,1), Jab_r[0],
+          rJ->Jab2(1,1), Jab_r[1],rr);
+
+      acc[tid][r->hostIDX + r->hostIDX*nframes[tid]].updateTopRight(
+          rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(),
+          rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
+          rJ->JabJIdx(0,0), rJ->JabJIdx(0,1),
+          rJ->JabJIdx(1,0), rJ->JabJIdx(1,1),
+          JI_r[0], JI_r[1]);
+    }
 
 
 		Vec2f Ji2_Jpdd = rJ->JIdx2 * rJ->Jpdd;
@@ -137,19 +177,19 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 		nres[tid]++;
 	}
 
-	if(mode==0)
+	if(mode==0) // active
 	{
 		p->Hdd_accAF = Hdd_acc;
 		p->bd_accAF = bd_acc;
 		p->Hcd_accAF = Hcd_acc;
 	}
-	if(mode==1 || mode==2)
+	if(mode==1 || mode==2) // linearized or marginalize
 	{
 		p->Hdd_accLF = Hdd_acc;
 		p->bd_accLF = bd_acc;
 		p->Hcd_accLF = Hcd_acc;
 	}
-	if(mode==2)
+	if(mode==2) // marginalize
 	{
 		p->Hcd_accAF.setZero();
 		p->Hdd_accAF = 0;

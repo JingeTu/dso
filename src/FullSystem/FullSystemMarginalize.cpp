@@ -204,6 +204,7 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
 	frame->shell->movedByOpt = frame->w2c_leftEps().norm();
 
 	deleteOutOrder<FrameHessian>(frameHessians, frame);
+	deleteOutOrder<FrameHessian>(frameHessiansRight, frame->rightFrame);
 	for(unsigned int i=0;i<frameHessians.size();i++)
 		frameHessians[i]->idx = i;
 

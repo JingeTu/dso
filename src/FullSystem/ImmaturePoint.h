@@ -24,6 +24,7 @@
 
 #pragma once
 
+#define USE_NCC 1
 
 #include "util/NumType.h"
 
@@ -59,8 +60,9 @@ namespace dso {
     float color[MAX_RES_PER_POINT];
     float weights[MAX_RES_PER_POINT];
 
+#if USE_NCC
     Vec15f patternNCCHostNormalized; // for NCC use
-
+#endif
 
     Mat22f gradH;
     Vec2f gradH_ev;
@@ -95,7 +97,7 @@ namespace dso {
     Vec2f lastTraceUV;
     float lastTracePixelInterval;
 
-    float idepth_GT;
+//    float idepth_GT;
 
     double linearizeResidual(
         CalibHessian *HCalib, const float outlierTHSlack,
