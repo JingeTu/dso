@@ -176,7 +176,7 @@ private:
 class ImageFolderReader
 {
 public:
-	ImageFolderReader(std::string path, std::string timestampFile, std::string calibFile, std::string gammaFile, std::string vignetteFile)
+	ImageFolderReader(std::string path, std::string datasetName, std::string timestampFile, std::string calibFile, std::string gammaFile, std::string vignetteFile)
 	{
 		this->path = path;
 		this->calibfile = calibFile;
@@ -196,7 +196,7 @@ public:
 		// load timestamps if possible.
 		// this is for EuRoCDataset
 		if (!timestampFile.empty()) {
-			loadTimestamps(timestampFile);
+			loadTimestamps(datasetName, timestampFile);
 		}
 		else
 			loadTimestamps();
@@ -400,34 +400,57 @@ private:
 		printf("got %d images and %d timestamps and %d exposures.!\n", (int)getNumImages(), (int)timestamps.size(), (int)exposures.size());
 	}
 
-	inline void loadTimestamps(std::string eurocTimestampFile)
+	inline void loadTimestamps(std::string datasetName, std::string timestampFile)
 	{
-		std::ifstream tr;
-		std::string timesFile = path.substr(0,path.find_last_of('/')) + "/data.csv";
-		tr.open(timesFile.c_str());
-		while(!tr.eof() && tr.good())
-		{
-			std::string line;
-			char buf[1000];
-			tr.getline(buf, 1000);
-
-			int id;
-			long long stampL;
-			double stamp;
-			float exposure = 0;
-			char filename[1000];
-
-			if(2 == sscanf(buf, "%lld,%s", &stampL, filename))
+		if (datasetName == "euroc") {
+			std::ifstream tr;
+			std::string timesFile = path.substr(0,path.find_last_of('/')) + "/data.csv";
+			tr.open(timesFile.c_str());
+			while(!tr.eof() && tr.good())
 			{
-				stamp = stampL * 1e-9;
-				timestamps.push_back(stamp);
+				std::string line;
+				char buf[1000];
+				tr.getline(buf, 1000);
+
+				int id;
+				long long stampL;
+				double stamp;
+				float exposure = 0;
+				char filename[1000];
+
+				if(2 == sscanf(buf, "%lld,%s", &stampL, filename))
+				{
+					stamp = stampL * 1e-9;
+					timestamps.push_back(stamp);
 //				exposures.push_back(exposure);
+				}
 			}
-
+			tr.close();
 		}
-		tr.close();
+		else if (datasetName == "kitti"){
+			std::ifstream tr;
+			std::string timesFile = path.substr(0,path.find_last_of('/')) + "/times.txt";
+			tr.open(timesFile.c_str());
+			while(!tr.eof() && tr.good())
+			{
+				std::string line;
+				char buf[1000];
+				tr.getline(buf, 1000);
 
-		printf("ImageFolder Reader: got %ld timestamps in %s.\n", timestamps.size(), eurocTimestampFile.c_str());
+				int id;
+				long long stampL;
+				double stamp;
+				float exposure = 0;
+				char filename[1000];
+
+				if(1 == sscanf(buf, "%lf", &stamp))
+				{
+					timestamps.push_back(stamp);
+				}
+			}
+			tr.close();
+		}
+		printf("ImageFolder Reader: got %ld timestamps in %s.\n", timestamps.size(), timestampFile.c_str());
 	}
 
 

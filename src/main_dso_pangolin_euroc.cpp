@@ -331,8 +331,8 @@ int main(int argc, char **argv) {
   // hook crtl+C.
   boost::thread exThread = boost::thread(exitThread);
 
-  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data_rec", source + "/cam0/data.csv",/*place for timestamp file*/ calib, gammaCalib, vignette);
-  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data_rec", source + "/cam1/data.csv",/*place for timestamp file*/ calibRight, gammaCalib, vignette);
+  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data_rec", "euroc", source + "/cam0/data.csv",/*place for timestamp file*/ calib, gammaCalib, vignette);
+  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data_rec", "euroc", source + "/cam1/data.csv",/*place for timestamp file*/ calibRight, gammaCalib, vignette);
   reader->setGlobalCalibration();
   reader_right->setGlobalCalibration();
 
