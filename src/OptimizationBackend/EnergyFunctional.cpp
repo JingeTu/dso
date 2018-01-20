@@ -278,8 +278,7 @@ namespace dso {
         if (!r->isActive()) continue;
         if (r->targetIDX == -1) { //- static stereo residual
           b -= xAd[r->hostIDX * nFrames + r->hostIDX] * r->JpJdF;
-        }
-        else {
+        } else {
           b -= xAd[r->hostIDX * nFrames + r->targetIDX] * r->JpJdF;
         }
       }
@@ -317,8 +316,7 @@ namespace dso {
         Mat18f dp;
         if (r->targetIDX == -1) { //- static stereo residual
           dp = adHTdeltaF[r->hostIDX + nFrames * r->hostIDX];
-        }
-        else { //- temporal stereo residual
+        } else { //- temporal stereo residual
           dp = adHTdeltaF[r->hostIDX + nFrames * r->targetIDX];
         }
         RawResidualJacobian *rJ = r->J;
@@ -468,8 +466,7 @@ namespace dso {
 
     if (r->targetIDX == -1) { //- static stereo residual
       //- do nothing
-    }
-    else { //- temporal stereo residual
+    } else { //- temporal stereo residual
       connectivityMap[(((uint64_t) r->host->frameID) << 32) + ((uint64_t) r->target->frameID)][0]--;
     }
     nResiduals--;
@@ -839,9 +836,7 @@ namespace dso {
         if ((setting_solverMode & SOLVER_SVD_CUT7) && (i >= Ub.size() - 7)) {
           Ub[i] = 0;
           setZero++;
-        }
-
-        else Ub[i] /= S[i];
+        } else Ub[i] /= S[i];
       }
       x = SVecI.asDiagonal() * svd.matrixV() * Ub;
 
@@ -865,7 +860,6 @@ namespace dso {
 //	printf("x.size(): %ld, %ld\n", x.rows(), x.cols());
     //resubstituteF(x, HCalib);
     currentLambda = lambda;
-    //- 前面优化得到的结果存储在ｘ当中
     resubstituteF_MT(x, HCalib, multiThreading);
     currentLambda = 0;
 

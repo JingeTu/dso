@@ -535,7 +535,6 @@ namespace dso {
     fh->shell->trackingRef = lastF->shell;
     fh->shell->aff_g2l = aff_g2l;
     fh->shell->T_WC = fh->shell->trackingRef->T_WC * fh->shell->camToTrackingRef;
-
     //- And also calculate right frame
     fhRight->shell->aff_g2l = aff_g2l;
     fhRight->shell->T_WC = fh->shell->trackingRef->T_WC * fh->shell->camToTrackingRef * leftToRight_SE3.inverse();
@@ -832,12 +831,9 @@ namespace dso {
 
       for (ImmaturePoint *ph : host->immaturePoints) {
         //- Do temporal stereo match
-        // host 中的 immaturePoints 先与 fh（左片匹配） 更新一波 idepth_min 和 idepth_max
         ImmaturePointStatus phTrackStatus = ph->traceOn(fh, KRKi, Kt, aff, &Hcalib, false);
 
         if (phTrackStatus == ImmaturePointStatus::IPS_GOOD) {
-          // 与左片匹配上了，可以得到这个点在左片上的坐标 ph->lastTraceUV(0), ph->lastTraceUV(1)
-          // 现在将这个点匹配两次，左片到右片，右片到左片，确定这个点在左片上的深度，最后用这个深度去更新在 host 上的深度
           ImmaturePoint *phNonKey = new ImmaturePoint(ph->lastTraceUV(0), ph->lastTraceUV(1), fh, ph->my_type, &Hcalib);
 
           Vec3f ptpMin = KRKi * (Vec3f(ph->u, ph->v, 1) / ph->idepth_min) + Kt;
@@ -922,7 +918,6 @@ namespace dso {
                                               fh->aff_g2l()).cast<float>();
 
       for (ImmaturePoint *ph : host->immaturePoints) {
-        // 使用 fh 优化 host 中所有 immaturePoints 点的深度
         ph->traceOn(fh, KRKi, Kt, aff, &Hcalib, false);
 
         if (ph->lastTraceStatus == ImmaturePointStatus::IPS_GOOD) trace_good++;
@@ -976,12 +971,9 @@ namespace dso {
       printf("SPARSITY:  MinActDist %f (need %d points, have %d points)!\n",
              currentMinActDist, (int) (setting_desiredPointDensity), ef->nPoints);
 
-    // 当前帧
     FrameHessian *newestHs = frameHessians.back();
 
     // make dist map.
-    // 这个东西实在是看不懂，又是 BFS 的，搞什么嘛。
-    // 反正这东西就是用 frameHessians 中的帧确定当前帧 newestHs 的深度图（1/2,1/2）level 1 的级别。
     coarseDistanceMap->makeK(&Hcalib);
     coarseDistanceMap->makeDistanceMap(frameHessians, newestHs);
 
@@ -990,8 +982,6 @@ namespace dso {
     std::vector<ImmaturePoint *> toOptimize;
     toOptimize.reserve(20000);
 
-    // 将 frameHessians 中所有帧的所有 immaturePoints 投影到当前帧的 level 1 影像上，确定深度在当前帧的深度。
-    // 如果深度满足 dist >= currentMinActDist * ph->my_type，就加入到 toOptimize 中去。
     for (FrameHessian *host : frameHessians)    // go through all active frames
     {
       if (host == newestHs) continue;
@@ -1060,7 +1050,6 @@ namespace dso {
     std::vector<PointHessian *> optimized;
     optimized.resize(toOptimize.size());
 
-    // 将当前帧 newestHs 的 pointHessians 的逆深度优化
     if (multiThreading)
       treadReduce.reduce(
           boost::bind(&FullSystem::activatePointsMT_Reductor, this, &optimized, &toOptimize, _1, _2, _3, _4), 0,
@@ -1069,7 +1058,6 @@ namespace dso {
     else
       activatePointsMT_Reductor(&optimized, &toOptimize, 0, toOptimize.size(), 0, 0);
 
-    // 正式地将 immaturePoint 转化为 pointHessians
     for (unsigned k = 0; k < toOptimize.size(); k++) {
       PointHessian *newpoint = optimized[k];
       ImmaturePoint *ph = toOptimize[k];
@@ -1186,7 +1174,7 @@ namespace dso {
       }
     }
 
-    // 正式地将 immaturePoint 转化为 pointHessians
+    //- Formally transform immaturePoints to pointHesssians
 //    for (unsigned k = 0; k < toOptimize.size(); k++) {
 //      PointHessian *newpoint = optimized[k];
 //      ImmaturePoint *ph = toOptimize[k];
@@ -1528,8 +1516,7 @@ namespace dso {
         coarseInitializer->T_WC_ini = SE3(q_WS, Vec3(0, 0, 0)) * T_SC0;
         //- Add the First frame to the corseInitializer.
         coarseInitializer->setFirstStereo(&Hcalib, fh, fhRight);
-      }
-      else if (coarseInitializer->trackFrame(fh, outputWrapper))  // if SNAPPED
+      } else if (coarseInitializer->trackFrame(fh, outputWrapper))  // if SNAPPED
       {
         initializeFromInitializer(fh);
         lock.unlock();
@@ -1550,7 +1537,6 @@ namespace dso {
         coarseTracker_forNewKF = tmp;
       }
 
-      // 确定 fh 与 coarseTracker->lastRef 的相对位置姿态。
       Vec4 tres = trackNewCoarseStereo(fh, fhRight);
       if (!std::isfinite((double) tres[0]) || !std::isfinite((double) tres[1]) || !std::isfinite((double) tres[2]) ||
           !std::isfinite((double) tres[3])) {
@@ -1706,9 +1692,6 @@ namespace dso {
       fh->setEvalPT_scaled(fh->shell->T_WC.inverse(), fh->shell->aff_g2l);
     }
 
-    // 使用当前帧更新 frameHessians 中所有帧的所有 immaturePoints 的 idepth_max 和 idepth_min
-    // 比 traceNewCoarseKey 多一步左右片匹配的过程
-//    traceNewCoarseNonKey(fh, fhRight);
     traceNewCoarseKey(fh);
     delete fh;
     delete fhRight;
@@ -1723,7 +1706,6 @@ namespace dso {
       fh->setEvalPT_scaled(fh->shell->T_WC.inverse(), fh->shell->aff_g2l);
     }
 
-    // 使用当前帧更新 frameHessians 中所有帧的所有 immaturePoints 的 idepth_max 和 idepth_min
     traceNewCoarseKey(fh);
 
     boost::unique_lock<boost::mutex> lock(mapMutex);
@@ -1734,13 +1716,10 @@ namespace dso {
 
     // =========================== add New Frame to Hessian Struct. =========================
     fh->idx = frameHessians.size();
-    // 当前帧加入 frameHessians
     frameHessians.push_back(fh);
-    // 右帧也加入 frameHessiansRight
     frameHessiansRight.push_back(fhRight);
     fh->frameID = allKeyFramesHistory.size();
     allKeyFramesHistory.push_back(fh->shell);
-    // 优化 添加 帧
     ef->insertFrame(fh, &Hcalib);
 
     setPrecalcValues();
@@ -1756,7 +1735,6 @@ namespace dso {
         PointFrameResidual *r = new PointFrameResidual(ph, fh1, fh);
         r->setState(ResState::IN);
         ph->residuals.push_back(r);
-        // 优化 添加 点与帧的联系
         ef->insertResidual(r);
         ph->lastResiduals[1] = ph->lastResiduals[0];
         ph->lastResiduals[0] = std::pair<PointFrameResidual *, ResState>(r, ResState::IN);
@@ -1768,9 +1746,7 @@ namespace dso {
 
 
     // =========================== Activate Points (& flag for marginalization). =========================
-    // 使用 frameHessians 中所有帧优化当前帧 immaturePoints 的逆深度，并且将这些点转换成 pointsHessians
     activatePointsMT();
-    // 优化 设置 三维点节点与帧的约束边
     ef->makeIDX();
 
 
@@ -1837,9 +1813,6 @@ namespace dso {
 
 
     // =========================== add new Immature points & new residuals =========================
-    // 左帧生成的immature points在后面新加关键帧(makeKeyFrame)的时候，
-    // traceNewCoarseKey(fh);确定 immature points的深度，
-    // activatePointsMT();将immature points转换成PointHessians
     makeNewTraces(fh, 0);
     //- use right frame to initialize the depth of fh->immaturePoints
     stereoMatch(fh, fhRight);
@@ -1867,8 +1840,6 @@ namespace dso {
 
   }
 
-
-  // 调用这个函数的时候newFrame相对于firstFrame的相对位置姿态未知。
   void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
     boost::unique_lock<boost::mutex> lock(mapMutex);
 

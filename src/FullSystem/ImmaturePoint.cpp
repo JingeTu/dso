@@ -80,6 +80,7 @@ namespace dso {
   }
 
 #if USE_NCC
+
   // modeRight == true, from left to right, modeRight == false, from right to left
   ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frameRight, Mat33f K, bool modeRight) {
     // KRKi
@@ -310,8 +311,8 @@ namespace dso {
 
       for (int idx = 0; idx < patternNumNCC; idx++) {
         J += -(gxTarget[idx] * dx + gyTarget[idx] * dy)
-            * (1 / normTarget - patternTarget[idx] / (normTarget * normTarget * normTarget))
-            * patternNCCHostNormalized[idx];
+             * (1 / normTarget - patternTarget[idx] / (normTarget * normTarget * normTarget))
+             * patternNCCHostNormalized[idx];
       }
 
       H = J * J;
@@ -379,6 +380,7 @@ namespace dso {
     idepth_stereo = (u_stereo - bestU) / bf;
     return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
   }
+
 #else
   // modeRight == true, from left to right, modeRight == false, from right to left
   ImmaturePointStatus ImmaturePoint::traceStereo(FrameHessian *frame, Mat33f K, bool modeRight) {

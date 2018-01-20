@@ -24,29 +24,29 @@
 
 
 #pragma once
+
 #include "util/settings.h"
 #include "util/NumType.h"
 #include "IMUMeasurement.h"
 
-namespace dso
-{
-	extern int wG[PYR_LEVELS], hG[PYR_LEVELS];
-	extern float fxG[PYR_LEVELS], fyG[PYR_LEVELS],
-		  cxG[PYR_LEVELS], cyG[PYR_LEVELS];
+namespace dso {
+  extern int wG[PYR_LEVELS], hG[PYR_LEVELS];
+  extern float fxG[PYR_LEVELS], fyG[PYR_LEVELS],
+      cxG[PYR_LEVELS], cyG[PYR_LEVELS];
 
-	extern float fxiG[PYR_LEVELS], fyiG[PYR_LEVELS],
-		  cxiG[PYR_LEVELS], cyiG[PYR_LEVELS];
+  extern float fxiG[PYR_LEVELS], fyiG[PYR_LEVELS],
+      cxiG[PYR_LEVELS], cyiG[PYR_LEVELS];
 
-	extern Eigen::Matrix3f KG[PYR_LEVELS],KiG[PYR_LEVELS];
+  extern Eigen::Matrix3f KG[PYR_LEVELS], KiG[PYR_LEVELS];
 
-	extern float wM3G;
-	extern float hM3G;
+  extern float wM3G;
+  extern float hM3G;
 
-	extern float baseline;
-	extern SE3 T_SC0;
-	extern IMUParameters imuParameters;
+  extern float baseline;
+  extern SE3 T_SC0;
+  extern IMUParameters imuParameters;
 
-	void setGlobalCameraCalib(int w, int h, const Eigen::Matrix3f &K);
+  void setGlobalCameraCalib(int w, int h, const Eigen::Matrix3f &K);
 
-	void setGlobalIMUCalib();
+  void setGlobalIMUCalib();
 }

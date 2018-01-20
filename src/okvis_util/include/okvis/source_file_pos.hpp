@@ -49,23 +49,20 @@
 /// \brief okvis Main namespace of this package.
 namespace okvis {
 
-  class source_file_pos
-  {
+  class source_file_pos {
   public:
     std::string function;
     std::string file;
     int line;
 
     source_file_pos(std::string function, std::string file, int line) :
-      function(function), file(file), line(line) {}
+        function(function), file(file), line(line) {}
 
-    operator std::string()
-    {
+    operator std::string() {
       return toString();
     }
 
-    std::string toString() const
-    {
+    std::string toString() const {
       std::stringstream s;
       s << file << ":" << line << ": " << function << "()";
       return s.str();
@@ -75,8 +72,7 @@ namespace okvis {
 
 }// namespace okvis
 
-inline std::ostream & operator<<(std::ostream & out, const okvis::source_file_pos & sfp)
-{
+inline std::ostream &operator<<(std::ostream &out, const okvis::source_file_pos &sfp) {
   out << sfp.file << ":" << sfp.line << ": " << sfp.function << "()";
   return out;
 }

@@ -18,8 +18,8 @@ add_library(${PROJECT_NAME} STATIC src/dependency-tracker.cc)
 
 # and link it                     
 target_link_libraries(${PROJECT_NAME}
-  PUBLIC okvis_util
-)
+        PUBLIC okvis_util
+        )
 
 # installation if required
 #install(TARGETS ${PROJECT_NAME}

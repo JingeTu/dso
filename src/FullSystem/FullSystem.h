@@ -198,6 +198,7 @@ namespace dso {
     void activatePoints();
 
     void activatePointsMT();
+
     void activatePointsRight(FrameHessian *fh, FrameHessian *fhRight);
 
     void activatePointsOldFirst();

@@ -776,8 +776,7 @@ namespace dso {
     // l5 baseline
     if (std::sscanf(l5.c_str(), "%f", &baseline) == 1) {
       printf("Baseline: %f \n", baseline);
-    }
-    else {
+    } else {
       printf("Out: Failed to Read Baseline... can not do stereo. \n");
     }
 

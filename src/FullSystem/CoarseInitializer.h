@@ -102,7 +102,7 @@ namespace dso {
     SE3 T_WC_ini; // the pose of first cam0 frame.
 
     FrameHessian *firstFrame;
-    FrameHessian* firstFrameRight;
+    FrameHessian *firstFrameRight;
     FrameHessian *newFrame;
   private:
     Mat33 K[PYR_LEVELS];

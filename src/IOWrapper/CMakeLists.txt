@@ -7,7 +7,7 @@ SET(BUILD_TYPE Release)
 # decide if we have pangolin
 if (Pangolin_FOUND)
     message("--- found PANGOLIN, compiling dso_pangolin library.")
-    include_directories( ${Pangolin_INCLUDE_DIRS} )
+    include_directories(${Pangolin_INCLUDE_DIRS})
     set(dso_pangolin_SOURCE_FILES
             Pangolin/KeyFrameDisplay.cpp
             Pangolin/PangolinDSOViewer.cpp)
@@ -15,14 +15,14 @@ if (Pangolin_FOUND)
 else ()
     message("--- could not find PANGOLIN, not compiling dso_pangolin library.")
     message("    this means there will be no 3D display / GUI available for dso_dataset.")
-    set(dso_pangolin_SOURCE_FILES )
+    set(dso_pangolin_SOURCE_FILES)
     set(HAS_PANGOLIN 0)
 endif ()
 
 # decide if we have openCV
 if (OpenCV_FOUND)
     message("--- found OpenCV, compiling dso_opencv library.")
-    include_directories( ${OpenCV_INCLUDE_DIRS} )
+    include_directories(${OpenCV_INCLUDE_DIRS})
     set(dso_opencv_SOURCE_FILES
             OpenCV/ImageDisplay_OpenCV.cpp
             OpenCV/ImageRW_OpenCV.cpp)

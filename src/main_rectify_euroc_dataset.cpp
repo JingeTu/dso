@@ -70,7 +70,8 @@ bool readImageFilePathsSingle(const std::string &basedir, std::vector<std::strin
   return true;
 }
 
-void readImageFilePaths(const std::string &basedir, std::vector<std::string> &vec_leftfiles, std::vector<std::string> &vec_rightfiles) {
+void readImageFilePaths(const std::string &basedir, std::vector<std::string> &vec_leftfiles,
+                        std::vector<std::string> &vec_rightfiles) {
   // cam0
   if (!readImageFilePathsSingle(basedir + "/cam0/", vec_leftfiles)) cout << "something wrong." << endl;
   // cam1
@@ -130,7 +131,7 @@ int main(int argc, char **argv) {
   K1 = (cv::Mat_<float>(3, 3) << 457.587, 0.0, 379.999,
       0.0, 456.134, 255.238,
       0.0, 0.0, 1.0);
-  D1 = (cv::Mat_<float>(1, 4) << -0.28368365,  0.07451284, -0.00010473, -3.55590700e-05);
+  D1 = (cv::Mat_<float>(1, 4) << -0.28368365, 0.07451284, -0.00010473, -3.55590700e-05);
 
   // get remap
   cv::Mat T_C0C1 = T_BC0.inv() * T_BC1;

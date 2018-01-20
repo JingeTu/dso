@@ -531,11 +531,11 @@ namespace dso {
       int lvlm1 = lvl - 1;
       int wl = w[lvl], hl = h[lvl], wlm = w[lvlm1];
 
-      float* idepth_l = idepth[lvl];
-      float* weightSums_l = weightSums[lvl];
+      float *idepth_l = idepth[lvl];
+      float *weightSums_l = weightSums[lvl];
 
-      float* idepth_lm = idepth[lvlm1];
-      float* weightSums_lm = weightSums[lvlm1];
+      float *idepth_lm = idepth[lvlm1];
+      float *weightSums_lm = weightSums[lvlm1];
 
       for (int y = 0; y < hl; y++)
         for (int x = 0; x < wl; x++) {
@@ -552,18 +552,37 @@ namespace dso {
       for (int it = 0; it < numIts; it++) {
         int wh = w[lvl] * h[lvl] - w[lvl];
         int wl = w[lvl];
-        float* weightSumsl = weightSums[lvl];
-        float* weightSumsl_bak = weightSums_bak[lvl];
+        float *weightSumsl = weightSums[lvl];
+        float *weightSumsl_bak = weightSums_bak[lvl];
         memcpy(weightSumsl_bak, weightSumsl, w[lvl] * h[lvl] * sizeof(float));
-        float* idepthl = idepth[lvl];
+        float *idepthl = idepth[lvl];
         for (int i = wl; i < wh; i++) {
           if (weightSumsl_bak[i] <= 0) {
             float sum = 0, num = 0, numn = 0;
-            if (weightSumsl_bak[i + 1 + wl] > 0) {sum += idepthl[i + 1 + wl]; num += weightSumsl_bak[i + 1 + wl]; numn++;}
-            if (weightSumsl_bak[i - 1 - wl] > 0) {sum += idepthl[i - 1 - wl]; num += weightSumsl_bak[i - 1 - wl]; numn++;}
-            if (weightSumsl_bak[i - 1 + wl] > 0) {sum += idepthl[i - 1 + wl]; num += weightSumsl_bak[i - 1 + wl]; numn++;}
-            if (weightSumsl_bak[i + 1 - wl] > 0) {sum += idepthl[i + 1 - wl]; num += weightSumsl_bak[i + 1 - wl]; numn++;}
-            if (numn > 0) {idepthl[i] = sum / numn; weightSumsl[i] = num / numn;}
+            if (weightSumsl_bak[i + 1 + wl] > 0) {
+              sum += idepthl[i + 1 + wl];
+              num += weightSumsl_bak[i + 1 + wl];
+              numn++;
+            }
+            if (weightSumsl_bak[i - 1 - wl] > 0) {
+              sum += idepthl[i - 1 - wl];
+              num += weightSumsl_bak[i - 1 - wl];
+              numn++;
+            }
+            if (weightSumsl_bak[i - 1 + wl] > 0) {
+              sum += idepthl[i - 1 + wl];
+              num += weightSumsl_bak[i - 1 + wl];
+              numn++;
+            }
+            if (weightSumsl_bak[i + 1 - wl] > 0) {
+              sum += idepthl[i + 1 - wl];
+              num += weightSumsl_bak[i + 1 - wl];
+              numn++;
+            }
+            if (numn > 0) {
+              idepthl[i] = sum / numn;
+              weightSumsl[i] = num / numn;
+            }
           }
         }
       }
@@ -572,45 +591,61 @@ namespace dso {
     for (int lvl = 2; lvl < pyrLevelsUsed; lvl++) {
       int wh = w[lvl] * h[lvl] - w[lvl];
       int wl = w[lvl];
-      float* weightSumsl = weightSums[lvl];
-      float* weightSumsl_bak = weightSums_bak[lvl];
+      float *weightSumsl = weightSums[lvl];
+      float *weightSumsl_bak = weightSums_bak[lvl];
       memcpy(weightSumsl_bak, weightSumsl, w[lvl] * h[lvl] * sizeof(float));
-      float* idepthl = idepth[lvl];
+      float *idepthl = idepth[lvl];
       for (int i = wl; i < wh; i++) {
         if (weightSumsl_bak[i] <= 0) {
           float sum = 0, num = 0, numn = 0;
-          if (weightSumsl_bak[i + 1 + wl] > 0) {sum += idepthl[i + 1 + wl]; num += weightSumsl_bak[i + 1 + wl]; numn++;}
-          if (weightSumsl_bak[i - 1 - wl] > 0) {sum += idepthl[i - 1 - wl]; num += weightSumsl_bak[i - 1 - wl]; numn++;}
-          if (weightSumsl_bak[i - 1 + wl] > 0) {sum += idepthl[i - 1 + wl]; num += weightSumsl_bak[i - 1 + wl]; numn++;}
-          if (weightSumsl_bak[i + 1 - wl] > 0) {sum += idepthl[i + 1 - wl]; num += weightSumsl_bak[i + 1 - wl]; numn++;}
-          if (numn > 0) {idepthl[i] = sum / numn; weightSumsl[i] = num / numn;}
+          if (weightSumsl_bak[i + 1 + wl] > 0) {
+            sum += idepthl[i + 1 + wl];
+            num += weightSumsl_bak[i + 1 + wl];
+            numn++;
+          }
+          if (weightSumsl_bak[i - 1 - wl] > 0) {
+            sum += idepthl[i - 1 - wl];
+            num += weightSumsl_bak[i - 1 - wl];
+            numn++;
+          }
+          if (weightSumsl_bak[i - 1 + wl] > 0) {
+            sum += idepthl[i - 1 + wl];
+            num += weightSumsl_bak[i - 1 + wl];
+            numn++;
+          }
+          if (weightSumsl_bak[i + 1 - wl] > 0) {
+            sum += idepthl[i + 1 - wl];
+            num += weightSumsl_bak[i + 1 - wl];
+            numn++;
+          }
+          if (numn > 0) {
+            idepthl[i] = sum / numn;
+            weightSumsl[i] = num / numn;
+          }
         }
       }
     }
 
     // normalize idepths and weights.
-    for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
-    {
-      float* weightSumsl = weightSums[lvl];
-      float* idepthl = idepth[lvl];
-      Eigen::Vector3f* dIRefl = lastRef->dIp[lvl];
+    for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
+      float *weightSumsl = weightSums[lvl];
+      float *idepthl = idepth[lvl];
+      Eigen::Vector3f *dIRefl = lastRef->dIp[lvl];
 
       int wl = w[lvl], hl = h[lvl];
 
-      int lpc_n=0;
-      float* lpc_u = pc_u[lvl];
-      float* lpc_v = pc_v[lvl];
-      float* lpc_idepth = pc_idepth[lvl];
-      float* lpc_color = pc_color[lvl];
+      int lpc_n = 0;
+      float *lpc_u = pc_u[lvl];
+      float *lpc_v = pc_v[lvl];
+      float *lpc_idepth = pc_idepth[lvl];
+      float *lpc_color = pc_color[lvl];
 
 
-      for(int y=2;y<hl-2;y++)
-        for(int x=2;x<wl-2;x++)
-        {
-          int i = x+y*wl;
+      for (int y = 2; y < hl - 2; y++)
+        for (int x = 2; x < wl - 2; x++) {
+          int i = x + y * wl;
 
-          if(weightSumsl[i] > 0)
-          {
+          if (weightSumsl[i] > 0) {
             idepthl[i] /= weightSumsl[i];
             lpc_u[lpc_n] = x;
             lpc_v[lpc_n] = y;
@@ -618,15 +653,12 @@ namespace dso {
             lpc_color[lpc_n] = dIRefl[i][0];
 
 
-
-            if(!std::isfinite(lpc_color[lpc_n]) || !(idepthl[i]>0))
-            {
+            if (!std::isfinite(lpc_color[lpc_n]) || !(idepthl[i] > 0)) {
               idepthl[i] = -1;
-              continue;	// just skip if something is wrong.
+              continue;  // just skip if something is wrong.
             }
             lpc_n++;
-          }
-          else
+          } else
             idepthl[i] = -1;
 
           weightSumsl[i] = 1;

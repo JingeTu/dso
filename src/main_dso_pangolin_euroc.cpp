@@ -331,8 +331,12 @@ int main(int argc, char **argv) {
   // hook crtl+C.
   boost::thread exThread = boost::thread(exitThread);
 
-  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data_rec", "euroc", source + "/cam0/data.csv",/*place for timestamp file*/ calib, gammaCalib, vignette);
-  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data_rec", "euroc", source + "/cam1/data.csv",/*place for timestamp file*/ calibRight, gammaCalib, vignette);
+  ImageFolderReader *reader = new ImageFolderReader(source + "/cam0/data_rec", "euroc",
+                                                    source + "/cam0/data.csv",/*place for timestamp file*/ calib,
+                                                    gammaCalib, vignette);
+  ImageFolderReader *reader_right = new ImageFolderReader(source + "/cam1/data_rec", "euroc",
+                                                          source + "/cam1/data.csv",/*place for timestamp file*/
+                                                          calibRight, gammaCalib, vignette);
   reader->setGlobalCalibration();
   reader_right->setGlobalCalibration();
 
@@ -417,7 +421,6 @@ int main(int argc, char **argv) {
     double sInitializerOffset = 0;
 
 
-    // 从第二帧开始吧，给 IMU 一点时间，初始化
     for (int ii = 1; ii < (int) idsToPlay.size(); ii++) {
       if (!fullSystem->initialized)  // if not initialized: reset start time.
       {

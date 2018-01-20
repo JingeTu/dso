@@ -288,7 +288,7 @@ namespace dso {
   }
 
 
-  double PointFrameResidual::linearizeStatic(CalibHessian* HCalib) {
+  double PointFrameResidual::linearizeStatic(CalibHessian *HCalib) {
     assert(host->rightFrame == target);
     state_NewEnergyWithOutlier = -1;
 

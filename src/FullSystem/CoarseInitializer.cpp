@@ -486,7 +486,8 @@ namespace dso {
     for (int i = 0; i < npts; i++) {
       Pnt *point = ptsl + i;
       if (!point->isGood_new) {
-        EAlpha.updateSingle((float) (point->energy[1])); // original is E, see issue#107, https://github.com/JakobEngel/dso/issues/107
+        EAlpha.updateSingle(
+            (float) (point->energy[1])); // original is E, see issue#107, https://github.com/JakobEngel/dso/issues/107
       } else {
         point->energy_new[1] = (point->idepth_new - 1) * (point->idepth_new - 1);
         EAlpha.updateSingle((float) (point->energy_new[1])); // original is E
@@ -906,7 +907,7 @@ namespace dso {
             pl[nl].u = x + 0.1;
             pl[nl].v = y + 0.1;
 
-            pl[nl].idepth = 1; // 如果不是第一层的，就设置 depth 为 1，人也不愿意为右片做金字塔影像。
+            pl[nl].idepth = 1;
             pl[nl].iR = 1;
 
             pl[nl].isGood = true;

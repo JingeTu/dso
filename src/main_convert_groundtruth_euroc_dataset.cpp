@@ -53,7 +53,7 @@ bool outputForEval(const std::string &outputFile, const std::vector<GTData> &gtD
   std::string l;
   char buf[1000];
 
-  for (const GTData& gtData : gtDatas) {
+  for (const GTData &gtData : gtDatas) {
     std::sprintf(buf, "%lf %f %f %f %f %f %f %f",
                  gtData.timestampD,
                  gtData.position[0], gtData.position[1], gtData.position[2],
@@ -65,7 +65,7 @@ bool outputForEval(const std::string &outputFile, const std::vector<GTData> &gtD
   return true;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   if (argc != 3) return 1;
 
   std::string gtFile(argv[1]);

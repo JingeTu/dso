@@ -159,47 +159,48 @@ namespace dso {
 
       // Jacobian part
       dalpha_db_g += dt * C_1;
-      const Eigen::Matrix3d cross_1 = dq.inverse().toRotationMatrix()*cross +
-                                      okvis::kinematics::rightJacobian(omega_S_true*dt)*dt;
+      const Eigen::Matrix3d cross_1 = dq.inverse().toRotationMatrix() * cross +
+                                      okvis::kinematics::rightJacobian(omega_S_true * dt) * dt;
       const Eigen::Matrix3d acc_S_x = okvis::kinematics::crossMx(acc_S_true);
-      Eigen::Matrix3d dv_db_g_1 = dv_db_g + 0.5*dt*(C*acc_S_x*cross + C_1*acc_S_x*cross_1);
-      dp_db_g += dt*dv_db_g + 0.25*dt*dt*(C*acc_S_x*cross + C_1*acc_S_x*cross_1);
+      Eigen::Matrix3d dv_db_g_1 = dv_db_g + 0.5 * dt * (C * acc_S_x * cross + C_1 * acc_S_x * cross_1);
+      dp_db_g += dt * dv_db_g + 0.25 * dt * dt * (C * acc_S_x * cross + C_1 * acc_S_x * cross_1);
 
       // covariance propagation
       if (covariance) {
-        Eigen::Matrix<double,15,15> F_delta = Eigen::Matrix<double,15,15>::Identity();
+        Eigen::Matrix<double, 15, 15> F_delta = Eigen::Matrix<double, 15, 15>::Identity();
         // transform
-        F_delta.block<3,3>(0,3) = -okvis::kinematics::crossMx(acc_integral*dt + 0.25*(C + C_1)*acc_S_true*dt*dt);
-        F_delta.block<3,3>(0,6) = Eigen::Matrix3d::Identity()*dt;
-        F_delta.block<3,3>(0,9) = dt*dv_db_g + 0.25*dt*dt*(C*acc_S_x*cross + C_1*acc_S_x*cross_1);
-        F_delta.block<3,3>(0,12) = -C_integral*dt + 0.25*(C + C_1)*dt*dt;
-        F_delta.block<3,3>(3,9) = -dt*C_1;
-        F_delta.block<3,3>(6,3) = -okvis::kinematics::crossMx(0.5*(C + C_1)*acc_S_true*dt);
-        F_delta.block<3,3>(6,9) = 0.5*dt*(C*acc_S_x*cross + C_1*acc_S_x*cross_1);
-        F_delta.block<3,3>(6,12) = -0.5*(C + C_1)*dt;
-        P_delta = F_delta*P_delta*F_delta.transpose();
+        F_delta.block<3, 3>(0, 3) = -okvis::kinematics::crossMx(
+            acc_integral * dt + 0.25 * (C + C_1) * acc_S_true * dt * dt);
+        F_delta.block<3, 3>(0, 6) = Eigen::Matrix3d::Identity() * dt;
+        F_delta.block<3, 3>(0, 9) = dt * dv_db_g + 0.25 * dt * dt * (C * acc_S_x * cross + C_1 * acc_S_x * cross_1);
+        F_delta.block<3, 3>(0, 12) = -C_integral * dt + 0.25 * (C + C_1) * dt * dt;
+        F_delta.block<3, 3>(3, 9) = -dt * C_1;
+        F_delta.block<3, 3>(6, 3) = -okvis::kinematics::crossMx(0.5 * (C + C_1) * acc_S_true * dt);
+        F_delta.block<3, 3>(6, 9) = 0.5 * dt * (C * acc_S_x * cross + C_1 * acc_S_x * cross_1);
+        F_delta.block<3, 3>(6, 12) = -0.5 * (C + C_1) * dt;
+        P_delta = F_delta * P_delta * F_delta.transpose();
         // add noise. Note that transformations with rotation matrices can be ignored, since the noise is isotropic.
         //F_tot = F_delta*F_tot;
         const double sigma2_dalpha = dt * sigma_g_c * sigma_g_c;
-        P_delta(3,3) += sigma2_dalpha;
-        P_delta(4,4) += sigma2_dalpha;
-        P_delta(5,5) += sigma2_dalpha;
+        P_delta(3, 3) += sigma2_dalpha;
+        P_delta(4, 4) += sigma2_dalpha;
+        P_delta(5, 5) += sigma2_dalpha;
         const double sigma2_v = dt * sigma_a_c * imuParameters.sigma_a_c;
-        P_delta(6,6) += sigma2_v;
-        P_delta(7,7) += sigma2_v;
-        P_delta(8,8) += sigma2_v;
-        const double sigma2_p = 0.5*dt*dt*sigma2_v;
-        P_delta(0,0) += sigma2_p;
-        P_delta(1,1) += sigma2_p;
-        P_delta(2,2) += sigma2_p;
+        P_delta(6, 6) += sigma2_v;
+        P_delta(7, 7) += sigma2_v;
+        P_delta(8, 8) += sigma2_v;
+        const double sigma2_p = 0.5 * dt * dt * sigma2_v;
+        P_delta(0, 0) += sigma2_p;
+        P_delta(1, 1) += sigma2_p;
+        P_delta(2, 2) += sigma2_p;
         const double sigma2_b_g = dt * imuParameters.sigma_gw_c * imuParameters.sigma_gw_c;
-        P_delta(9,9)   += sigma2_b_g;
-        P_delta(10,10) += sigma2_b_g;
-        P_delta(11,11) += sigma2_b_g;
+        P_delta(9, 9) += sigma2_b_g;
+        P_delta(10, 10) += sigma2_b_g;
+        P_delta(11, 11) += sigma2_b_g;
         const double sigma2_b_a = dt * imuParameters.sigma_aw_c * imuParameters.sigma_aw_c;
-        P_delta(12,12) += sigma2_b_a;
-        P_delta(13,13) += sigma2_b_a;
-        P_delta(14,14) += sigma2_b_a;
+        P_delta(12, 12) += sigma2_b_a;
+        P_delta(13, 13) += sigma2_b_a;
+        P_delta(14, 14) += sigma2_b_a;
       }
 
       // memory shift
@@ -221,34 +222,34 @@ namespace dso {
 //             + C_WS_0*(acc_doubleintegral/*-C_doubleintegral*speedAndBiases.segment<3>(6)*/)
 //             - 0.5*g_W*Delta_t*Delta_t,
 //             q_WS_0*Delta_q);
-    T_WS.setQuaternion(q_WS_0*Delta_q);
-    T_WS.translation() = r_0+speedAndBias.head<3>()*Delta_t
-                         + C_WS_0*(acc_doubleintegral/*-C_doubleintegral*speedAndBiases.segment<3>(6)*/)
-                         - 0.5*g_W*Delta_t*Delta_t;
-    speedAndBias.head<3>() += C_WS_0*(acc_integral/*-C_integral*speedAndBiases.segment<3>(6)*/)-g_W*Delta_t;
+    T_WS.setQuaternion(q_WS_0 * Delta_q);
+    T_WS.translation() = r_0 + speedAndBias.head<3>() * Delta_t
+                         + C_WS_0 * (acc_doubleintegral/*-C_doubleintegral*speedAndBiases.segment<3>(6)*/)
+                         - 0.5 * g_W * Delta_t * Delta_t;
+    speedAndBias.head<3>() += C_WS_0 * (acc_integral/*-C_integral*speedAndBiases.segment<3>(6)*/) - g_W * Delta_t;
 
     // assign Jacobian, if requested
     if (jacobian) {
-      Eigen::Matrix<double,15,15> & F = *jacobian;
+      Eigen::Matrix<double, 15, 15> &F = *jacobian;
       F.setIdentity(); // holds for all states, including d/dalpha, d/db_g, d/db_a
-      F.block<3,3>(0,3) = -okvis::kinematics::crossMx(C_WS_0*acc_doubleintegral);
-      F.block<3,3>(0,6) = Eigen::Matrix3d::Identity()*Delta_t;
-      F.block<3,3>(0,9) = C_WS_0*dp_db_g;
-      F.block<3,3>(0,12) = -C_WS_0*C_doubleintegral;
-      F.block<3,3>(3,9) = -C_WS_0*dalpha_db_g;
-      F.block<3,3>(6,3) = -okvis::kinematics::crossMx(C_WS_0*acc_integral);
-      F.block<3,3>(6,9) = C_WS_0*dv_db_g;
-      F.block<3,3>(6,12) = -C_WS_0*C_integral;
+      F.block<3, 3>(0, 3) = -okvis::kinematics::crossMx(C_WS_0 * acc_doubleintegral);
+      F.block<3, 3>(0, 6) = Eigen::Matrix3d::Identity() * Delta_t;
+      F.block<3, 3>(0, 9) = C_WS_0 * dp_db_g;
+      F.block<3, 3>(0, 12) = -C_WS_0 * C_doubleintegral;
+      F.block<3, 3>(3, 9) = -C_WS_0 * dalpha_db_g;
+      F.block<3, 3>(6, 3) = -okvis::kinematics::crossMx(C_WS_0 * acc_integral);
+      F.block<3, 3>(6, 9) = C_WS_0 * dv_db_g;
+      F.block<3, 3>(6, 12) = -C_WS_0 * C_integral;
     }
 
     // overall covariance, if requested
     if (covariance) {
-      Eigen::Matrix<double,15,15> & P = *covariance;
+      Eigen::Matrix<double, 15, 15> &P = *covariance;
       // transform from local increments to actual states
-      Eigen::Matrix<double,15,15> T = Eigen::Matrix<double,15,15>::Identity();
-      T.topLeftCorner<3,3>() = C_WS_0;
-      T.block<3,3>(3,3) = C_WS_0;
-      T.block<3,3>(6,6) = C_WS_0;
+      Eigen::Matrix<double, 15, 15> T = Eigen::Matrix<double, 15, 15>::Identity();
+      T.topLeftCorner<3, 3>() = C_WS_0;
+      T.block<3, 3>(3, 3) = C_WS_0;
+      T.block<3, 3>(6, 6) = C_WS_0;
       P = T * P_delta * T.transpose();
     }
     return i;
