@@ -77,6 +77,8 @@ endif()
 # build main executable (only if we have both OpenCV and Pangolin)
 if (OpenCV_FOUND AND Pangolin_FOUND)
 	message("--- compiling dso_dataset.")
+	add_executable(convert_groundtruth_euroc ${PROJECT_SOURCE_DIR}/src/main_convert_groundtruth_euroc_dataset.cpp)
+	target_link_libraries(convert_groundtruth_euroc)
 
 	add_executable(dso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp )
     target_link_libraries(dso_dataset dso_util dso_FullSystem dso_IOWrapper dso_OptimizationBackend boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})

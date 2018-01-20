@@ -341,9 +341,8 @@ namespace dso {
       coarseTracker->makeK(&Hcalib);
       coarseTracker->setCTRefForFirstFrame(frameHessians);
 
-      lastF = coarseTracker->lastRef;
-    }
-    else {
+    } else {
+
       FrameShell *slast = allFrameHistory[allFrameHistory.size() - 2];
       FrameShell *sprelast = allFrameHistory[allFrameHistory.size() - 3];
       SE3 slast_2_sprelast;
@@ -565,6 +564,7 @@ namespace dso {
 
     return Vec4(achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2]);
   }
+
 /*
   Vec4 FullSystem::trackNewCoarse(FrameHessian *fh) {
 
@@ -1450,7 +1450,7 @@ namespace dso {
         float depth = 1.0f / ip->idepth_stereo;
 
         if (phTraceLeftStatus == ImmaturePointStatus::IPS_GOOD && u_stereo_delta < 1 && depth > 0 &&
-            depth < 7) //original u_stereo_delta 1 depth < 70
+            depth < 70) //original u_stereo_delta 1 depth < 70
         {
           ip->idepth_min = ip->idepth_min_stereo;
           ip->idepth_max = ip->idepth_max_stereo;
@@ -1485,7 +1485,7 @@ namespace dso {
 //    printf("addActive Frame left timestamp: %lf, right timestamp: %lf\n", image->timestamp, imageRight->timestamp);
 
     //- Checkout if camera intrinsics changed.
-    printf("Hcalib: %f, %f, %f, %f\n", Hcalib.fxl(), Hcalib.fyl(), Hcalib.cxl(), Hcalib.cyl());
+//    printf("Hcalib: %f, %f, %f, %f\n", Hcalib.fxl(), Hcalib.fyl(), Hcalib.cxl(), Hcalib.cyl());
 
     // =========================== add into allFrameHistory =========================
     FrameHessian *fh = new FrameHessian();
@@ -1504,7 +1504,7 @@ namespace dso {
     fh->rightFrame = fhRight;
     fhRight->leftFrame = fh;
 
-    printf("addActiveFrame allFrameHistory.size(): %ld\n", allFrameHistory.size());
+//    printf("addActiveFrame allFrameHistory.size(): %ld\n", allFrameHistory.size());
 
 
     // =========================== make Images / derivatives etc. =========================
@@ -1514,8 +1514,8 @@ namespace dso {
     fhRight->makeImages(imageRight->image, &Hcalib);
     //- FrameHessian::makeImages() just calculate some image gradient.
 
-    printf("frameHessians.size(), frameHessiansRight.size(): %ld, %ld\n",
-           frameHessians.size(), frameHessiansRight.size());
+//    printf("frameHessians.size(), frameHessiansRight.size(): %ld, %ld\n",
+//           frameHessians.size(), frameHessiansRight.size());
 
     if (!initialized) {
       // use initializer!
@@ -1527,9 +1527,7 @@ namespace dso {
         // T_WS * T_SC0 = T_WC0
         coarseInitializer->T_WC_ini = SE3(q_WS, Vec3(0, 0, 0)) * T_SC0;
         //- Add the First frame to the corseInitializer.
-//        coarseInitializer->setFirst(&Hcalib, fh);
         coarseInitializer->setFirstStereo(&Hcalib, fh, fhRight);
-//        initialized = true;
       }
       else if (coarseInitializer->trackFrame(fh, outputWrapper))  // if SNAPPED
       {
@@ -1551,10 +1549,6 @@ namespace dso {
         coarseTracker = coarseTracker_forNewKF;
         coarseTracker_forNewKF = tmp;
       }
-
-      // initialized propagate imu measurements first for trackNewCoarseStereo initial pose
-//      imuPropagation->propagate(imuMeasurements, )
-
 
       // 确定 fh 与 coarseTracker->lastRef 的相对位置姿态。
       Vec4 tres = trackNewCoarseStereo(fh, fhRight);
@@ -1916,7 +1910,7 @@ namespace dso {
       printf("Initialization: keep %.1f%% (need %d, have %d)!\n", 100 * keepPercentage,
              (int) (setting_desiredPointDensity), coarseInitializer->numPoints[0]);
 
-    // initialize *first frame* by idepth computed by static stereo matching
+    //- initialize *first frame* by idepth computed by static stereo matching
     for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
       if (rand() / (float) RAND_MAX > keepPercentage) continue;
 
@@ -1928,7 +1922,41 @@ namespace dso {
       ip->idepth_min_stereo = 0;
       ip->idepth_max_stereo = NAN;
 
-      ip->traceStereo(firstFrameRight, K, 1);
+      const ImmaturePointStatus ipTraceRightStatus = ip->traceStereo(firstFrameRight, K, 1);
+
+//      if (ipTraceRightStatus == ImmaturePointStatus::IPS_GOOD) {
+//        ImmaturePoint *ipRight = new ImmaturePoint(ip->lastTraceUV(0), ip->lastTraceUV(1), firstFrameRight, point->my_type, &Hcalib);
+//
+//        ipRight->u_stereo = ipRight->u;
+//        ipRight->v_stereo = ipRight->v;
+//        ipRight->idepth_min_stereo = ipRight->idepth_min = 0;
+//        ipRight->idepth_max_stereo = ipRight->idepth_max = 0;
+//        const ImmaturePointStatus ipTraceLeftStatus = ipRight->traceStereo(firstFrame, K, 0);
+//
+//        float u_stereo_delta = abs(ip->u_stereo - ipRight->lastTraceUV(0));
+//        float depth = 1.0f / ip->idepth_stereo;
+//
+//        if (ipTraceLeftStatus == ImmaturePointStatus::IPS_GOOD && u_stereo_delta < 1 && depth > 0 && depth < 70) {
+//          ip->idepth_min = ip->idepth_min_stereo;
+//          ip->idepth_max = ip->idepth_max_stereo;
+//
+//          PointHessian *ph = new PointHessian(ip, &Hcalib);
+//          delete ip;
+//          if (!std::isfinite(ph->energyTH)) {
+//            delete ph;
+//            continue;
+//          }
+//
+//          ph->setIdepthScaled(ip->idepth_stereo);
+//          ph->setIdepthZero(ip->idepth_stereo);
+//          ph->hasDepthPrior = true;
+//          ph->setPointStatus(PointHessian::ACTIVE);
+//
+//
+//          firstFrame->pointHessians.push_back(ph);
+//          ef->insertPoint(ph);
+//        }
+//      }
 
       ip->idepth_min = ip->idepth_min_stereo;
       ip->idepth_max = ip->idepth_max_stereo;
@@ -1988,7 +2016,6 @@ namespace dso {
     int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap, setting_desiredImmatureDensity);
 
     newFrame->pointHessians.reserve(numPointsTotal * 1.2f);
-    //fh->pointHessiansInactive.reserve(numPointsTotal*1.2f);
     newFrame->pointHessiansMarginalized.reserve(numPointsTotal * 1.2f);
     newFrame->pointHessiansOut.reserve(numPointsTotal * 1.2f);
 
@@ -2013,7 +2040,7 @@ namespace dso {
       fh->targetPrecalc.resize(frameHessians.size() + 1);
       for (unsigned int i = 0; i < frameHessians.size(); i++)
         fh->targetPrecalc[i].set(fh, frameHessians[i], &Hcalib);
-        fh->targetPrecalc.back().set(fh, fh->rightFrame, &Hcalib);
+      fh->targetPrecalc.back().set(fh, fh->rightFrame, &Hcalib);
     }
 
     ef->setDeltaF(&Hcalib);

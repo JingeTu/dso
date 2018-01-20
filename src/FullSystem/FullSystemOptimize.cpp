@@ -459,10 +459,6 @@ float FullSystem::optimize(int mnumOptIts)
 	double lastEnergyL = calcLEnergy();
 	double lastEnergyM = calcMEnergy();
 
-	printf("lastEnergy[0]: %lf, lastEnergyL: %lf, lastEnergyM: %lf\n", lastEnergy[0], lastEnergyL, lastEnergyM);
-
-
-
 	if(multiThreading)
 		treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, true, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
 	else
