@@ -1794,16 +1794,15 @@ namespace dso {
     // =========================== Figure Out if INITIALIZATION FAILED =========================
     if (allKeyFramesHistory.size() <= 4) {
       if (allKeyFramesHistory.size() == 2 && rmse > 20 * benchmark_initializerSlackFactor) {
-        printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+        printf("I THINK INITIALIZATION FAILED! Resetting.\n");
         initFailed = true;
-        traceNewCoarseKey(fh);
       }
       if (allKeyFramesHistory.size() == 3 && rmse > 13 * benchmark_initializerSlackFactor) {
-        printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+        printf("I THINK INITIALIZATION FAILED! Resetting.\n");
         initFailed = true;
       }
       if (allKeyFramesHistory.size() == 4 && rmse > 9 * benchmark_initializerSlackFactor) {
-        printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+        printf("I THINK INITIALIZATION FAILED! Resetting.\n");
         initFailed = true;
       }
     }
