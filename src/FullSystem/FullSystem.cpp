@@ -1450,7 +1450,7 @@ namespace dso {
         float depth = 1.0f / ip->idepth_stereo;
 
         if (phTraceLeftStatus == ImmaturePointStatus::IPS_GOOD && u_stereo_delta < 1 && depth > 0 &&
-            depth < 7) //original u_stereo_delta 1 depth < 70
+            depth < 40) //original u_stereo_delta 1 depth < 70
         {
           ip->idepth_min = ip->idepth_min_stereo;
           ip->idepth_max = ip->idepth_max_stereo;
@@ -1796,7 +1796,6 @@ namespace dso {
       if (allKeyFramesHistory.size() == 2 && rmse > 20 * benchmark_initializerSlackFactor) {
         printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
         initFailed = true;
-        traceNewCoarseKey(fh);
       }
       if (allKeyFramesHistory.size() == 3 && rmse > 13 * benchmark_initializerSlackFactor) {
         printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
